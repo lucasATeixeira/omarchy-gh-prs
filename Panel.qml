@@ -14,12 +14,13 @@ Panel {
   moduleName: "lucas.gh-prs"
   ipcTarget: "lucas.gh-prs"
 
-  // nf-fa-github, the multiplication sign shown on error, nf-md-robot, nf-md-check_circle, and nf-md-file_document_edit.
+  // nf-fa-github, the multiplication sign shown on error, nf-md-robot, nf-md-check_circle, nf-md-file_document_edit, and nf-md-comment_outline.
   readonly property string iconGithub: ""
   readonly property string iconError: "✕"
   readonly property string iconAiReview: "󰚩"
   readonly property string iconApproved: "󰗠"
   readonly property string iconChangesRequested: "󰷈"
+  readonly property string iconUnresolvedThreads: "󰆂"
 
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
@@ -359,6 +360,16 @@ Panel {
                     anchors.verticalCenter: parent.verticalCenter
                     visible: text !== ""
                     text: root.reviewDecisionIcon(row.modelData.reviewDecision)
+                    textFormat: Text.PlainText
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.foreground
+                  }
+
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: row.modelData.unresolvedThreadCount > 0
+                    text: root.iconUnresolvedThreads + " " + row.modelData.unresolvedThreadCount
                     textFormat: Text.PlainText
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
