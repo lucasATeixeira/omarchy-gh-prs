@@ -30,6 +30,7 @@
  * @property {boolean} aiReviewDone
  * @property {?ReviewDecision} reviewDecision Null when the repo requires no review.
  * @property {number} unresolvedThreadCount
+ * @property {boolean} hasConflict True when the branch conflicts with the base branch.
  */
 
 /**
@@ -156,9 +157,9 @@ function sections(prs) {
         .filter(function (section) { return section.prs.length > 0; });
 }
 
-/** GraphQL query for the user's 50 most recently updated open PRs, their review decision and threads, and their latest commit's checks. */
+/** GraphQL query for the user's 50 most recently updated open PRs, their review decision, threads, and mergeability, and their latest commit's checks. */
 var QUERY = "query { search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) {"
-    + " nodes { ... on PullRequest { number title url isDraft updatedAt reviewDecision repository { nameWithOwner }"
+    + " nodes { ... on PullRequest { number title url isDraft updatedAt reviewDecision mergeable repository { nameWithOwner }"
     + " reviewThreads(first: 100) { nodes { isResolved } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
     + " __typename ... on CheckRun { name status conclusion } ... on StatusContext { context state } } } } } } } } } } }";
@@ -195,7 +196,8 @@ function toPullRequest(node, aiCheckPatterns) {
         status: prStatus(checks),
         aiReviewDone: aiReviewDone(checks, aiCheckPatterns),
         reviewDecision: node.reviewDecision,
-        unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length
+        unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length,
+        hasConflict: node.mergeable === "CONFLICTING"
     };
 }
 
