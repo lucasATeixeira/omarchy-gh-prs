@@ -200,10 +200,37 @@ function toPullRequest(node, aiCheckPatterns) {
  * @returns {PullRequest[]}
  */
 function finishedAiReviews(previousPrs, currentPrs) {
-    var notDoneUrls = (previousPrs || [])
-        .filter(function (pr) { return !pr.aiReviewDone; })
-        .map(function (pr) { return pr.url; });
-    return currentPrs.filter(function (pr) { return pr.aiReviewDone && notDoneUrls.indexOf(pr.url) !== -1; });
+    return changedSincePoll(previousPrs, currentPrs, function (before, now) {
+        return !before.aiReviewDone && now.aiReviewDone;
+    });
+}
+
+/**
+ * PRs whose CI finished: running in the previous poll, and failing or passing now.
+ * A PR missing from the previous poll is skipped, and so is every PR on the first poll.
+ * @param {?PullRequest[]} previousPrs Null before the first successful poll.
+ * @param {PullRequest[]} currentPrs
+ * @returns {PullRequest[]}
+ */
+function finishedCi(previousPrs, currentPrs) {
+    return changedSincePoll(previousPrs, currentPrs, function (before, now) {
+        return before.status === "running" && (now.status === "failing" || now.status === "passing");
+    });
+}
+
+/**
+ * Current PRs that `changed` accepts against the same PR, matched by URL, in the previous poll.
+ * @param {?PullRequest[]} previousPrs
+ * @param {PullRequest[]} currentPrs
+ * @param {function(PullRequest, PullRequest): boolean} changed Gets the previous and the current PR.
+ * @returns {PullRequest[]}
+ */
+function changedSincePoll(previousPrs, currentPrs, changed) {
+    var previous = previousPrs || [];
+    return currentPrs.filter(function (now) {
+        var before = previous.find(function (pr) { return pr.url === now.url; });
+        return before !== undefined && changed(before, now);
+    });
 }
 
 /**
@@ -254,6 +281,7 @@ if (typeof module !== "undefined") {
         prStatus: prStatus,
         parseRun: parseRun,
         finishedAiReviews: finishedAiReviews,
+        finishedCi: finishedCi,
         barSummary: barSummary,
         sections: sections,
         errorMessage: errorMessage,

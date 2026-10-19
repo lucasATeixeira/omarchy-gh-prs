@@ -199,6 +199,31 @@ describe('finishedAiReviews', () => {
   })
 })
 
+const ci = (number, status) => Object.assign(pr(status, undefined, number), { url: 'u' + number })
+
+describe('finishedCi', () => {
+  it('lists PRs whose CI went from running to passing or failing', () => {
+    const previous = [ci(1, 'running'), ci(2, 'running')]
+    const current = [ci(1, 'passing'), ci(2, 'failing')]
+    assert.deepEqual(P.finishedCi(previous, current).map(p => p.number), [1, 2])
+  })
+
+  it('ignores every other status change', () => {
+    const changes = [['passing', 'failing'], ['failing', 'passing'], ['running', 'none'], ['running', 'running']]
+    for (const [before, now] of changes) {
+      assert.deepEqual(P.finishedCi([ci(1, before)], [ci(1, now)]), [], before + ' -> ' + now)
+    }
+  })
+
+  it('ignores PRs seen for the first time', () => {
+    assert.deepEqual(P.finishedCi([ci(1, 'running')], [ci(2, 'passing')]), [])
+  })
+
+  it('ignores everything on the first poll', () => {
+    assert.deepEqual(P.finishedCi(null, [ci(1, 'passing')]), [])
+  })
+})
+
 describe('parseRun exit codes', () => {
   it('parses stdout when gh succeeds', () => {
     assert.equal(P.parseRun(0, response([prNode()]), '', '').prs[0].status, 'failing')
