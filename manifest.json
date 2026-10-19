@@ -19,10 +19,12 @@
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
-      "refreshIntervalSec": 10
+      "refreshIntervalSec": 10,
+      "aiCheckNames": "CodeRabbit"
     },
     "schema": [
-      { "key": "refreshIntervalSec", "type": "number", "label": "Refresh interval (seconds)" }
+      { "key": "refreshIntervalSec", "type": "number", "label": "Refresh interval (seconds)" },
+      { "key": "aiCheckNames", "type": "string", "label": "AI check names (comma-separated)" }
     ]
   }
 }

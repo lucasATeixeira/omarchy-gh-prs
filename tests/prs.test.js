@@ -6,8 +6,8 @@ const { loadQmlLibrary } = require('./load.js')
 
 const P = loadQmlLibrary('js/prs.js')
 
-const run = (status, conclusion) => ({ __typename: 'CheckRun', status, conclusion })
-const ctx = (state) => ({ __typename: 'StatusContext', state })
+const run = (status, conclusion, name = 'tests') => ({ __typename: 'CheckRun', name, status, conclusion })
+const ctx = (state, context = 'ci/lint') => ({ __typename: 'StatusContext', context, state })
 
 describe('prStatus', () => {
   it('is failing when any check failed, even while others run', () => {
@@ -53,7 +53,7 @@ const response = (nodes) => JSON.stringify({ data: { search: { nodes } } })
 
 describe('parseRun success', () => {
   it('turns search results into pull requests with their CI status', () => {
-    assert.deepEqual(P.parseRun(0, response([prNode()]), ''), {
+    assert.deepEqual(P.parseRun(0, response([prNode()]), '', ''), {
       prs: [{
         repo: 'acme/app',
         number: 7,
@@ -61,7 +61,8 @@ describe('parseRun success', () => {
         url: 'https://github.com/acme/app/pull/7',
         isDraft: false,
         updatedAt: '2026-10-19T10:00:00Z',
-        status: 'failing'
+        status: 'failing',
+        aiReviewDone: false
       }],
       error: ''
     })
@@ -69,11 +70,11 @@ describe('parseRun success', () => {
 
   it('gives status none to a PR without a check rollup', () => {
     const node = prNode({ commits: { nodes: [{ commit: { statusCheckRollup: null } }] } })
-    assert.equal(P.parseRun(0, response([node]), '').prs[0].status, 'none')
+    assert.equal(P.parseRun(0, response([node]), '', '').prs[0].status, 'none')
   })
 
   it('reports output that is not JSON', () => {
-    assert.equal(P.parseRun(0, '<html>', '').error, 'Unexpected response from gh')
+    assert.equal(P.parseRun(0, '<html>', '', '').error, 'Unexpected response from gh')
   })
 })
 
@@ -145,9 +146,62 @@ describe('errorMessage', () => {
   })
 })
 
+const withChecks = (checks) => prNode({ commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: checks } } } }] } })
+const aiReviewDoneFor = (checks, aiCheckNames = 'CodeRabbit') => P.parseRun(0, response([withChecks(checks)]), '', aiCheckNames).prs[0].aiReviewDone
+
+describe('parseRun AI review', () => {
+  it('is done when the AI check finished, even while other checks run', () => {
+    assert.equal(aiReviewDoneFor([ctx('SUCCESS', 'CodeRabbit'), run('IN_PROGRESS', null)]), true)
+  })
+
+  it('waits for every AI check', () => {
+    const checks = [ctx('SUCCESS', 'CodeRabbit'), run('IN_PROGRESS', null, 'Cursor Bugbot')]
+    assert.equal(aiReviewDoneFor(checks, 'coderabbit, bugbot'), false)
+  })
+
+  it('counts a failed AI check as done', () => {
+    assert.equal(aiReviewDoneFor([run('COMPLETED', 'FAILURE', 'claude-review')], 'claude'), true)
+  })
+
+  it('is not done without a matching AI check', () => {
+    assert.equal(aiReviewDoneFor([run('COMPLETED', 'SUCCESS')]), false)
+  })
+
+  it('is off when the setting has only blank names', () => {
+    assert.equal(aiReviewDoneFor([ctx('SUCCESS', 'CodeRabbit')], ' , '), false)
+  })
+
+  it('is not done for a PR without a check rollup', () => {
+    const node = prNode({ commits: { nodes: [{ commit: { statusCheckRollup: null } }] } })
+    assert.equal(P.parseRun(0, response([node]), '', 'CodeRabbit').prs[0].aiReviewDone, false)
+  })
+})
+
+const reviewed = (number, done) => Object.assign(pr('running', undefined, number), { url: 'u' + number, aiReviewDone: done })
+
+describe('finishedAiReviews', () => {
+  it('lists PRs whose AI review finished since the last poll', () => {
+    const previous = [reviewed(1, false), reviewed(2, false)]
+    const current = [reviewed(1, true), reviewed(2, false)]
+    assert.deepEqual(P.finishedAiReviews(previous, current).map(p => p.number), [1])
+  })
+
+  it('ignores PRs already done in the last poll', () => {
+    assert.deepEqual(P.finishedAiReviews([reviewed(1, true)], [reviewed(1, true)]), [])
+  })
+
+  it('ignores PRs seen for the first time', () => {
+    assert.deepEqual(P.finishedAiReviews([reviewed(1, false)], [reviewed(2, true)]), [])
+  })
+
+  it('ignores everything on the first poll', () => {
+    assert.deepEqual(P.finishedAiReviews(null, [reviewed(1, true)]), [])
+  })
+})
+
 describe('parseRun exit codes', () => {
   it('parses stdout when gh succeeds', () => {
-    assert.equal(P.parseRun(0, response([prNode()]), '').prs[0].status, 'failing')
+    assert.equal(P.parseRun(0, response([prNode()]), '', '').prs[0].status, 'failing')
   })
 
   it('drops the PR list and reports the error when gh fails', () => {

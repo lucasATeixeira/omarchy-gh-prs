@@ -48,6 +48,19 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 - Zero PRs: "No open pull requests".
 - On error: only the error message. When the cause is auth, the message is "Not logged in to GitHub. Run: gh auth login". The error clears on the next successful poll.
 
+## AI review
+
+Some repos run an AI code reviewer in CI, such as CodeRabbit. The widget tells the user when its review is ready to read, even while other **Checks** still run.
+
+- Setting `aiCheckNames`: a comma-separated string, default `"CodeRabbit"`. A Check is an **AI Check** when its name contains one of the patterns, ignoring case. The name is `context` for a commit status and `name` for a check run.
+- **AI review done**: the latest commit has at least one AI Check, and every AI Check on it has finished, with any result. A new commit makes the PR not done again.
+- Status rules, Sections, and the Badge do not change. An AI Check counts toward the PR's Status like any other Check.
+- Row: a robot icon to the right of the Status dot when the AI review is done. Always in the normal text color. PRs without AI Checks look as before.
+- Notification: when a PR was seen in the last successful poll as not done and is done now. Title `AI review done`, body `owner/repo#123 — <PR title>`. Clicking it opens the PR.
+- No notification on the first poll after a start, or for a PR seen for the first time.
+- A failed poll does not change the last seen PRs.
+- Bot PR reviews without a Check, such as Copilot's, are out of scope.
+
 ## Tests
 
 - Pure logic lives in `js/prs.js` and is tested with `node:test` in `tests/prs.test.js`.

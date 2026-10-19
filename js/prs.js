@@ -6,6 +6,8 @@
  * A check as GitHub's GraphQL API returns it inside a status check rollup.
  * @typedef {Object} CheckContext
  * @property {string} __typename "CheckRun" or "StatusContext".
+ * @property {string} [name] CheckRun name.
+ * @property {string} [context] StatusContext name.
  * @property {string} [status] CheckRun progress, e.g. "IN_PROGRESS" or "COMPLETED".
  * @property {?string} [conclusion] CheckRun result once completed.
  * @property {string} [state] StatusContext state.
@@ -23,6 +25,7 @@
  * @property {boolean} isDraft
  * @property {string} updatedAt ISO 8601 timestamp.
  * @property {Status} status
+ * @property {boolean} aiReviewDone
  */
 
 /**
@@ -49,12 +52,45 @@ function checkStatus(check) {
 }
 
 /**
+ * @param {CheckContext} check
+ * @returns {string}
+ */
+function checkName(check) {
+    return check.__typename === "CheckRun" ? check.name : check.context;
+}
+
+/**
  * Combines a PR's checks: any failure wins, then anything unfinished.
  * @param {CheckContext[]} checks
  * @returns {Status}
  */
 function prStatus(checks) {
     return worstStatus(checks.map(checkStatus));
+}
+
+/**
+ * Splits the `aiCheckNames` setting into lowercase patterns, dropping blank ones.
+ * @param {string} aiCheckNames
+ * @returns {string[]}
+ */
+function aiCheckPatterns(aiCheckNames) {
+    return aiCheckNames.split(",")
+        .map(function (pattern) { return pattern.trim().toLowerCase(); })
+        .filter(function (pattern) { return pattern !== ""; });
+}
+
+/**
+ * Whether the checks include an AI Check and every AI Check has finished.
+ * @param {CheckContext[]} checks
+ * @param {string[]} patterns Lowercase substrings of an AI Check's name.
+ * @returns {boolean}
+ */
+function aiReviewDone(checks, patterns) {
+    var aiChecks = checks.filter(function (check) {
+        var name = checkName(check).toLowerCase();
+        return patterns.some(function (pattern) { return name.indexOf(pattern) !== -1; });
+    });
+    return aiChecks.length > 0 && aiChecks.every(function (check) { return checkStatus(check) !== "running"; });
 }
 
 /** Statuses from worst to best. */
@@ -120,26 +156,30 @@ function sections(prs) {
 var QUERY = "query { search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) {"
     + " nodes { ... on PullRequest { number title url isDraft updatedAt repository { nameWithOwner }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
-    + " __typename ... on CheckRun { status conclusion } ... on StatusContext { state } } } } } } } } } } }";
+    + " __typename ... on CheckRun { name status conclusion } ... on StatusContext { context state } } } } } } } } } } }";
 
 /**
  * Turns one `gh api graphql` run with QUERY into the PRs to show, or an error.
  * @param {number} exitCode
  * @param {string} stdout
  * @param {string} stderr
+ * @param {string} aiCheckNames The `aiCheckNames` setting; empty means no AI Checks.
  * @returns {FetchResult}
  */
-function parseRun(exitCode, stdout, stderr) {
+function parseRun(exitCode, stdout, stderr, aiCheckNames) {
     if (exitCode !== 0) return { prs: [], error: errorMessage(stderr, exitCode) };
     try {
-        return { prs: JSON.parse(stdout).data.search.nodes.map(toPullRequest), error: "" };
+        var patterns = aiCheckPatterns(aiCheckNames);
+        var nodes = JSON.parse(stdout).data.search.nodes;
+        return { prs: nodes.map(function (node) { return toPullRequest(node, patterns); }), error: "" };
     } catch (e) {
         return { prs: [], error: "Unexpected response from gh" };
     }
 }
 
-function toPullRequest(node) {
+function toPullRequest(node, aiCheckPatterns) {
     var rollup = node.commits.nodes[0].commit.statusCheckRollup;
+    var checks = rollup ? rollup.contexts.nodes : [];
     return {
         repo: node.repository.nameWithOwner,
         number: node.number,
@@ -147,8 +187,23 @@ function toPullRequest(node) {
         url: node.url,
         isDraft: node.isDraft,
         updatedAt: node.updatedAt,
-        status: prStatus(rollup ? rollup.contexts.nodes : [])
+        status: prStatus(checks),
+        aiReviewDone: aiReviewDone(checks, aiCheckPatterns)
     };
+}
+
+/**
+ * PRs whose AI review was not done in the previous poll and is done now.
+ * A PR missing from the previous poll is skipped, and so is every PR on the first poll.
+ * @param {?PullRequest[]} previousPrs Null before the first successful poll.
+ * @param {PullRequest[]} currentPrs
+ * @returns {PullRequest[]}
+ */
+function finishedAiReviews(previousPrs, currentPrs) {
+    var notDoneUrls = (previousPrs || [])
+        .filter(function (pr) { return !pr.aiReviewDone; })
+        .map(function (pr) { return pr.url; });
+    return currentPrs.filter(function (pr) { return pr.aiReviewDone && notDoneUrls.indexOf(pr.url) !== -1; });
 }
 
 /**
@@ -198,6 +253,7 @@ if (typeof module !== "undefined") {
         QUERY: QUERY,
         prStatus: prStatus,
         parseRun: parseRun,
+        finishedAiReviews: finishedAiReviews,
         barSummary: barSummary,
         sections: sections,
         errorMessage: errorMessage,
