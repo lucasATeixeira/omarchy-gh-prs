@@ -12,7 +12,7 @@ An Omarchy shell bar widget that shows the CI status of the user's open GitHub p
 - The `gh` CLI runs one GraphQL query: open PRs the user authored, across all repos, drafts included, at most 50.
 - CI comes from the latest commit's `statusCheckRollup`. All **Checks** count, not only required ones.
 - The same query also reads each PR's `reviewDecision`, `mergeable`, and review threads' `isResolved`.
-- Polls every 10 seconds (`refreshIntervalSec` in the manifest defaults), plus a refresh when the popup opens.
+- Polls every `refreshIntervalSec` seconds (default 10), plus a refresh when the popup opens.
 - Setup: the user runs `gh auth login` once.
 
 ## Status rules
@@ -47,13 +47,14 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 - Row: a small Status dot (~5px), `owner/repo#123`, the title elided with "…", and a "draft" label after the title when the PR is a draft. Clicking a row opens the PR in the browser and closes the popup.
 - Before the first fetch ends: no list and no empty message.
 - Zero PRs: "No open pull requests".
+- Escape closes the popup, and Tab switches to the next bar panel, like the shell's own panels.
 - On error: only the error message. When the cause is auth, the message is "Not logged in to GitHub. Run: gh auth login". The error clears on the next successful poll.
 
 ## AI review
 
 Some repos run an AI code reviewer in CI, such as CodeRabbit. The widget tells the user when its review is ready to read, even while other **Checks** still run.
 
-- Setting `aiCheckNames`: a comma-separated string, default `"CodeRabbit"`. A Check is an **AI Check** when its name contains one of the patterns, ignoring case. The name is `context` for a commit status and `name` for a check run.
+- Setting `aiCheckNames`: a comma-separated string of **AI check patterns**, default `"CodeRabbit"`. A Check is an **AI Check** when its name contains one of the patterns, ignoring case. The name is `context` for a commit status and `name` for a check run.
 - **AI review done**: the latest commit has at least one AI Check, and every AI Check on it has finished, with any result. A new commit makes the PR not done again.
 - Status rules, Sections, and the Badge do not change. An AI Check counts toward the PR's Status like any other Check.
 - Row: a robot icon to the right of the Status dot when the AI review is done. Always in the normal text color. PRs without AI Checks look as before.
@@ -72,7 +73,7 @@ The widget tells the user when a PR's **CI finished**, so they do not need to wa
 - Title `CI passed` or `CI failed`, body `owner/repo#123 — <PR title>`. Clicking it opens the PR.
 - One notification per PR. When the AI review is done and CI finished in the same poll, both notifications are sent.
 - Same rules as the AI review notification: none on the first poll after a start, none for a PR seen for the first time, and a failed poll does not change the last seen PRs.
-- Drafts are included. No setting.
+- Drafts are included. Each notification can be turned off in Settings.
 
 ## Review and merge icons
 
@@ -88,6 +89,48 @@ Icons on each row show if a PR is ready to merge. They do not change Status, Sec
 - Unresolved threads: `nf-md-comment_outline` followed by the number of review threads with `isResolved` false. Every thread counts: from any author, bots included, outdated included. Plain conversation comments are not counted, because they cannot be resolved. No icon when the count is 0.
 - Conflict: `nf-md-alert` when `mergeable` is `CONFLICTING`. `MERGEABLE` and `UNKNOWN` show no icon.
 - No notifications for review decision, threads, or conflicts.
+
+## Settings
+
+A gear button in the popup lets the user change the widget's settings without editing `shell.json` by hand.
+
+### Settings page
+
+- A gear button (`nf-md-cog`) sits on the right of the popup header, next to the Bar summary. Clicking it replaces the PR list with the settings page.
+- While the page is open, the header title is "Settings" and the gear becomes a back arrow (`nf-md-arrow_left`). The back arrow or Escape returns to the PR list.
+- Three plain sections, in order: Refresh, AI checks, Notifications. No collapsing.
+- Every change applies right away and is saved to the widget's entry in `shell.json` through `bar.shell.updateEntryInline`. Toggles save on click; fields save on Enter or when they lose focus. All other keys in the entry are kept.
+
+### Refresh
+
+- `refreshIntervalSec`: a whole number of seconds, from 5 to 3600, default 10.
+- A number field with up and down arrows that step by 5. A typed value outside the range is clamped to the nearest limit; a value that is not a number goes back to the saved value.
+- The poll timer uses the new interval right away.
+
+### AI checks
+
+- Shows the **AI check patterns** from `aiCheckNames` as a list, one row per pattern, each with an ✕ that removes it.
+- A text field and an Add button below the list. Enter in the field also adds.
+- Add splits the text on commas, trims each part, and skips blank parts and patterns already in the list, ignoring case.
+- The setting stays a comma-separated string; the list is joined with `, ` when saved.
+- An empty list is allowed. The page then shows "No AI check patterns. The robot icon and AI review notifications are off."
+- When the patterns change, the widget polls right away and forgets the last seen PRs, so that poll sends no notifications. Without this, every PR whose new AI Checks already finished would notify at once.
+
+### Notifications
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `notificationsEnabled` | `true` | Master switch. When off, no notification is sent. |
+| `notifyAiReviewDone` | `true` | Send `AI review done`. |
+| `notifyCiPassed` | `true` | Send `CI passed`. |
+| `notifyCiFailed` | `true` | Send `CI failed`. |
+
+- The three toggles sit under the master switch, indented. When the master switch is off, they are greyed out and cannot be changed, but keep their values.
+- Turning a notification off does not change how the last seen PRs are tracked, so turning it back on does not send old notifications.
+
+### Manifest
+
+- `defaults` and `schema` list every key above, so they can still be edited by hand. `refreshIntervalSec` is an `integer` with `min: 5` and `max: 3600`; the notification keys are `boolean`.
 
 ## Tests
 

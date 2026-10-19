@@ -74,14 +74,58 @@ function prStatus(checks) {
 }
 
 /**
- * Splits the `aiCheckNames` setting into lowercase patterns, dropping blank ones.
+ * Splits the `aiCheckNames` setting into AI check patterns as typed, dropping blank ones and case-insensitive duplicates.
+ * @param {string} aiCheckNames
+ * @returns {string[]}
+ */
+function parseAiCheckPatterns(aiCheckNames) {
+    var seen = [];
+    return aiCheckNames.split(",")
+        .map(function (pattern) { return pattern.trim(); })
+        .filter(function (pattern) {
+            var key = pattern.toLowerCase();
+            if (pattern === "" || seen.indexOf(key) !== -1) return false;
+            seen.push(key);
+            return true;
+        });
+}
+
+/**
+ * Adds each comma-separated part of `text` to the patterns, skipping blank parts and patterns already there.
+ * @param {string[]} patterns
+ * @param {string} text
+ * @returns {string[]}
+ */
+function addAiCheckPatterns(patterns, text) {
+    return parseAiCheckPatterns(patterns.concat(text).join(","));
+}
+
+/**
+ * The `aiCheckNames` setting that stores the patterns.
+ * @param {string[]} patterns
+ * @returns {string}
+ */
+function joinAiCheckPatterns(patterns) {
+    return patterns.join(", ");
+}
+
+/**
+ * The patterns without one of them.
+ * @param {string[]} patterns
+ * @param {string} pattern
+ * @returns {string[]}
+ */
+function removeAiCheckPattern(patterns, pattern) {
+    return patterns.filter(function (other) { return other !== pattern; });
+}
+
+/**
+ * Splits the `aiCheckNames` setting into lowercase patterns for matching.
  * @param {string} aiCheckNames
  * @returns {string[]}
  */
 function aiCheckPatterns(aiCheckNames) {
-    return aiCheckNames.split(",")
-        .map(function (pattern) { return pattern.trim().toLowerCase(); })
-        .filter(function (pattern) { return pattern !== ""; });
+    return parseAiCheckPatterns(aiCheckNames).map(function (pattern) { return pattern.toLowerCase(); });
 }
 
 /**
@@ -293,6 +337,63 @@ function themeColors(toml) {
     };
 }
 
+/**
+ * The widget's entry in `shell.json`, as far as this widget reads it.
+ * @typedef {Object} WidgetSettings
+ * @property {number} [refreshIntervalSec]
+ * @property {string} [aiCheckNames]
+ * @property {boolean} [notificationsEnabled]
+ * @property {boolean} [notifyAiReviewDone]
+ * @property {boolean} [notifyCiPassed]
+ * @property {boolean} [notifyCiFailed]
+ */
+
+/** @typedef {"notifyAiReviewDone"|"notifyCiPassed"|"notifyCiFailed"} NotificationSetting */
+
+var REFRESH_INTERVAL_MIN_SEC = 5;
+var REFRESH_INTERVAL_MAX_SEC = 3600;
+var REFRESH_INTERVAL_DEFAULT_SEC = 10;
+
+/**
+ * The `refreshIntervalSec` setting as whole seconds within the allowed range; the default when it is not a number.
+ * @param {unknown} value
+ * @returns {number}
+ */
+function refreshIntervalSec(value) {
+    var seconds = Math.round(Number(value));
+    if (!isFinite(seconds)) return REFRESH_INTERVAL_DEFAULT_SEC;
+    return Math.min(REFRESH_INTERVAL_MAX_SEC, Math.max(REFRESH_INTERVAL_MIN_SEC, seconds));
+}
+
+/**
+ * The setting that turns the CI notification for this status on or off.
+ * @param {Status} status
+ * @returns {NotificationSetting}
+ */
+function ciNotificationSetting(status) {
+    return status === "passing" ? "notifyCiPassed" : "notifyCiFailed";
+}
+
+/**
+ * Whether a boolean setting is on; a missing key counts as on.
+ * @param {WidgetSettings} settings
+ * @param {"notificationsEnabled"|NotificationSetting} key
+ * @returns {boolean}
+ */
+function settingOn(settings, key) {
+    return settings[key] !== false;
+}
+
+/**
+ * Whether a notification may be sent: the master switch and its own setting are both on.
+ * @param {WidgetSettings} settings
+ * @param {NotificationSetting} key
+ * @returns {boolean}
+ */
+function notificationEnabled(settings, key) {
+    return settingOn(settings, "notificationsEnabled") && settingOn(settings, key);
+}
+
 if (typeof module !== "undefined") {
     module.exports = {
         QUERY: QUERY,
@@ -301,6 +402,16 @@ if (typeof module !== "undefined") {
         finishedAiReviews: finishedAiReviews,
         finishedCi: finishedCi,
         ciNotificationTitle: ciNotificationTitle,
+        ciNotificationSetting: ciNotificationSetting,
+        notificationEnabled: notificationEnabled,
+        settingOn: settingOn,
+        REFRESH_INTERVAL_MIN_SEC: REFRESH_INTERVAL_MIN_SEC,
+        REFRESH_INTERVAL_MAX_SEC: REFRESH_INTERVAL_MAX_SEC,
+        refreshIntervalSec: refreshIntervalSec,
+        parseAiCheckPatterns: parseAiCheckPatterns,
+        addAiCheckPatterns: addAiCheckPatterns,
+        joinAiCheckPatterns: joinAiCheckPatterns,
+        removeAiCheckPattern: removeAiCheckPattern,
         barSummary: barSummary,
         sections: sections,
         errorMessage: errorMessage,

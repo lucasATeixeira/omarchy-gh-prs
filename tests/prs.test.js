@@ -307,3 +307,117 @@ describe('parseRun exit codes', () => {
     assert.deepEqual(P.parseRun(1, '', 'gh: Something went wrong\n'), { prs: [], error: 'gh: Something went wrong' })
   })
 })
+
+describe('refreshIntervalSec', () => {
+  it('keeps a value inside the range', () => {
+    assert.equal(P.refreshIntervalSec(30), 30)
+  })
+
+  it('clamps to the allowed range', () => {
+    assert.equal(P.refreshIntervalSec(1), 5)
+    assert.equal(P.refreshIntervalSec(9000), 3600)
+  })
+
+  it('rounds to whole seconds', () => {
+    assert.equal(P.refreshIntervalSec(12.6), 13)
+  })
+
+  it('reads numeric strings', () => {
+    assert.equal(P.refreshIntervalSec('20'), 20)
+  })
+
+  it('falls back to the default for a value that is not a number', () => {
+    assert.equal(P.refreshIntervalSec('soon'), 10)
+    assert.equal(P.refreshIntervalSec(undefined), 10)
+  })
+})
+
+describe('parseAiCheckPatterns', () => {
+  it('splits on commas and trims, keeping the case', () => {
+    assert.deepEqual(P.parseAiCheckPatterns(' CodeRabbit ,Copilot'), ['CodeRabbit', 'Copilot'])
+  })
+
+  it('drops blank patterns and duplicates, ignoring case', () => {
+    assert.deepEqual(P.parseAiCheckPatterns('CodeRabbit,, ,coderabbit'), ['CodeRabbit'])
+  })
+
+  it('is empty for an empty setting', () => {
+    assert.deepEqual(P.parseAiCheckPatterns(''), [])
+  })
+})
+
+describe('addAiCheckPatterns', () => {
+  it('appends each comma-separated part', () => {
+    assert.deepEqual(P.addAiCheckPatterns(['CodeRabbit'], 'foo, bar'), ['CodeRabbit', 'foo', 'bar'])
+  })
+
+  it('skips blank parts and patterns already in the list', () => {
+    assert.deepEqual(P.addAiCheckPatterns(['CodeRabbit'], ' , CODERABBIT'), ['CodeRabbit'])
+  })
+
+  it('adds to an empty list', () => {
+    assert.deepEqual(P.addAiCheckPatterns([], 'Copilot'), ['Copilot'])
+  })
+})
+
+describe('joinAiCheckPatterns', () => {
+  it('joins the patterns with a comma and a space', () => {
+    assert.equal(P.joinAiCheckPatterns(['CodeRabbit', 'Copilot']), 'CodeRabbit, Copilot')
+  })
+
+  it('is empty for no patterns', () => {
+    assert.equal(P.joinAiCheckPatterns([]), '')
+  })
+
+  it('round-trips through parseAiCheckPatterns', () => {
+    assert.deepEqual(P.parseAiCheckPatterns(P.joinAiCheckPatterns(['a', 'b'])), ['a', 'b'])
+  })
+})
+
+describe('removeAiCheckPattern', () => {
+  it('removes only the given pattern', () => {
+    assert.deepEqual(P.removeAiCheckPattern(['CodeRabbit', 'Copilot'], 'CodeRabbit'), ['Copilot'])
+  })
+
+  it('leaves an empty list after removing the last pattern', () => {
+    assert.deepEqual(P.removeAiCheckPattern(['CodeRabbit'], 'CodeRabbit'), [])
+  })
+})
+
+describe('settingOn', () => {
+  it('is true when the key is missing', () => {
+    assert.equal(P.settingOn({}, 'notifyCiPassed'), true)
+  })
+
+  it('is false only when the key is false', () => {
+    assert.equal(P.settingOn({ notifyCiPassed: false }, 'notifyCiPassed'), false)
+    assert.equal(P.settingOn({ notifyCiPassed: true }, 'notifyCiPassed'), true)
+  })
+})
+
+describe('ciNotificationSetting', () => {
+  it('matches the CI result', () => {
+    assert.equal(P.ciNotificationSetting('passing'), 'notifyCiPassed')
+    assert.equal(P.ciNotificationSetting('failing'), 'notifyCiFailed')
+  })
+})
+
+describe('notificationEnabled', () => {
+  it('is true when every key is missing', () => {
+    assert.equal(P.notificationEnabled({}, 'notifyAiReviewDone'), true)
+  })
+
+  it('is false when the master switch is off, whatever the toggle says', () => {
+    assert.equal(P.notificationEnabled({ notificationsEnabled: false, notifyCiPassed: true }, 'notifyCiPassed'), false)
+  })
+
+  it('is false when its own toggle is off', () => {
+    for (const key of ['notifyAiReviewDone', 'notifyCiPassed', 'notifyCiFailed']) {
+      assert.equal(P.notificationEnabled({ [key]: false }, key), false, key)
+    }
+  })
+
+  it('ignores the other toggles', () => {
+    assert.equal(P.notificationEnabled({ notifyCiPassed: false, notifyAiReviewDone: false }, 'notifyCiFailed'), true)
+  })
+})

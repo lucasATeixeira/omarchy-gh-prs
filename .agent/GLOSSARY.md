@@ -2,7 +2,9 @@
 
 **Check**: one CI result on a PR's latest commit. In the GitHub API it is a `CheckRun` (GitHub Actions and apps) or a `StatusContext` (commit statuses). _Avoid_: job, build.
 
-**AI Check**: a Check made by an AI code reviewer, such as CodeRabbit. The user chooses which Checks are AI Checks by name. An AI Check still counts toward its PR's Status like any other Check. _Avoid_: AI review, bot review.
+**AI Check**: a Check made by an AI code reviewer, such as CodeRabbit. A Check is an AI Check when its name matches an AI check pattern. An AI Check still counts toward its PR's Status like any other Check. _Avoid_: AI review, bot review.
+
+**AI check pattern**: a piece of text that the user chooses. Any Check whose name contains it, ignoring case, is an AI Check. For example, `rabbit` matches `CodeRabbit`. With no patterns, there are no AI Checks. _Avoid_: AI check name.
 
 **AI review done**: a PR whose latest commit has at least one AI Check, and every AI Check on it has finished, with any result. A new commit makes the PR not done again.
 

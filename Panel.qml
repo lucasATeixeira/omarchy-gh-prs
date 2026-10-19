@@ -21,6 +21,8 @@ Panel {
   readonly property string iconChangesRequested: "󰷈" // nf-md-file_document_edit
   readonly property string iconUnresolvedThreads: "󰆂" // nf-md-comment_outline
   readonly property string iconConflict: "󰀦" // nf-md-alert
+  readonly property string iconSettings: "󰒓" // nf-md-cog
+  readonly property string iconBack: "󰁍" // nf-md-arrow_left
   readonly property var reviewDecisionIcons: ({ APPROVED: iconApproved, CHANGES_REQUESTED: iconChangesRequested })
 
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
@@ -32,6 +34,10 @@ Panel {
   property string error: ""
   property bool loaded: false
   property var colors: Prs.DEFAULT_COLORS
+  property bool settingsOpen: false
+
+  readonly property string aiCheckNames: String(setting("aiCheckNames", "CodeRabbit"))
+  readonly property int refreshIntervalSec: Prs.refreshIntervalSec(setting("refreshIntervalSec", 10))
 
   readonly property var summary: Prs.barSummary(prs)
   readonly property var prSections: Prs.sections(prs)
@@ -54,8 +60,35 @@ Panel {
     fetchProc.running = true
   }
 
-  // Sends a desktop notification about a PR; clicking it opens the PR.
-  function notify(icon, title, pr) {
+  // Saves the overrides to this widget's entry in shell.json and applies them right away.
+  function saveSettings(overrides) {
+    root.settings = Object.assign({}, root.settings, overrides)
+    if (bar) bar.shell.updateEntryInline(root.moduleName, root.settings)
+  }
+
+  // Polls right away and forgets the last seen PRs, so newly matched AI Checks do not all notify at once.
+  function saveAiCheckPatterns(patterns) {
+    var aiCheckNames = Prs.joinAiCheckPatterns(patterns)
+    if (aiCheckNames === Prs.joinAiCheckPatterns(Prs.parseAiCheckPatterns(root.aiCheckNames))) return
+    saveSettings({ aiCheckNames: aiCheckNames })
+    root.lastPrs = null
+    refresh()
+  }
+
+  function openSettings() {
+    settingsOpen = true
+    scroller.contentY = 0
+  }
+
+  function closeSettings() {
+    settingsOpen = false
+    scroller.contentY = 0
+    keyCatcher.forceActiveFocus()
+  }
+
+  // Sends a desktop notification about a PR when its setting allows it; clicking it opens the PR.
+  function notify(setting, icon, title, pr) {
+    if (!Prs.notificationEnabled(root.settings, setting)) return
     Util.execArgv([
       "omarchy-notification-send", "--app-name", "GitHub PRs", "-g", icon,
       title, pr.repo + "#" + pr.number + " — " + pr.title,
@@ -63,7 +96,7 @@ Panel {
     ])
   }
 
-  onOpenedChanged: if (opened) refresh()
+  onOpenedChanged: opened ? refresh() : closeSettings()
 
   FileView {
     id: themeFile
@@ -79,13 +112,13 @@ Panel {
     stderr: StdioCollector { id: fetchStderr; waitForEnd: true }
     onExited: function(exitCode) {
       var result = Prs.parseRun(exitCode, String(fetchStdout.text), String(fetchStderr.text),
-                                String(root.setting("aiCheckNames", "CodeRabbit")))
+                                root.aiCheckNames)
       if (result.error === "") {
         Prs.finishedAiReviews(root.lastPrs, result.prs).forEach(function(pr) {
-          root.notify(root.iconAiReview, "AI review done", pr)
+          root.notify("notifyAiReviewDone", root.iconAiReview, "AI review done", pr)
         })
         Prs.finishedCi(root.lastPrs, result.prs).forEach(function(pr) {
-          root.notify(root.iconGithub, Prs.ciNotificationTitle(pr.status), pr)
+          root.notify(Prs.ciNotificationSetting(pr.status), root.iconGithub, Prs.ciNotificationTitle(pr.status), pr)
         })
         root.lastPrs = result.prs
       }
@@ -96,7 +129,7 @@ Panel {
   }
 
   Timer {
-    interval: Math.max(1, Number(root.setting("refreshIntervalSec", 10))) * 1000
+    interval: root.refreshIntervalSec * 1000
     running: true
     repeat: true
     triggeredOnStart: true
@@ -213,211 +246,242 @@ Panel {
     onPressed: root.toggle()
   }
 
-  PopupCard {
+  KeyboardPanel {
     id: popup
     anchorItem: button
     owner: root
     bar: root.bar
     open: root.opened
+    focusTarget: keyCatcher
     contentWidth: popup.fittedContentWidth(Style.space(420))
-    contentHeight: popup.fittedContentHeight(header.implicitHeight + header.spacing + prList.implicitHeight, popup.screenH * 0.6)
+    contentHeight: popup.fittedContentHeight(header.implicitHeight + header.spacing + scroller.contentHeight, popup.screenH * 0.6)
 
-    Column {
-      id: header
-      width: parent.width
-      spacing: Style.space(10)
-
-      Item {
-        width: parent.width
-        height: Math.max(headerTitle.implicitHeight, headerBadge.implicitHeight)
-
-        Text {
-          id: headerTitle
-          anchors.left: parent.left
-          anchors.verticalCenter: parent.verticalCenter
-          text: "Pull Requests"
-          textFormat: Text.PlainText
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.title
-          font.bold: true
-          color: root.foreground
-        }
-
-        StatusBadge {
-          id: headerBadge
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          visible: root.badgeStatus !== "none"
-          status: root.badgeStatus
-          label: root.badgeLabel
-        }
-      }
-
-      PanelSeparator { width: parent.width }
-    }
-
-    Flickable {
-      id: scroller
-      anchors.top: header.bottom
-      anchors.topMargin: header.spacing
-      anchors.bottom: parent.bottom
-      width: parent.width
-      contentHeight: prList.implicitHeight
-      boundsBehavior: Flickable.StopAtBounds
-      clip: true
-
-      ScrollBar.vertical: ScrollBar {
-        policy: ScrollBar.AsNeeded
-        // A custom handle loses the style's auto-hide, so hide it while the list fits.
-        visible: size < 1.0
-        contentItem: Rectangle {
-          implicitWidth: Style.space(3)
-          radius: width / 2
-          color: Util.alpha(root.foreground, 0.3)
-        }
-      }
+    PanelKeyCatcher {
+      id: keyCatcher
+      anchors.fill: parent
+      onCloseRequested: root.settingsOpen ? root.closeSettings() : root.close()
+      onTabRequested: function(direction) { if (!root.settingsOpen) root.switchPanel(direction) }
 
       Column {
-        id: prList
-        // Leaves room for the scrollbar when the list overflows.
-        width: parent.width - (scroller.contentHeight > scroller.height ? Style.space(10) : 0)
+        id: header
+        width: parent.width
         spacing: Style.space(10)
 
-        Text {
-          visible: root.error !== ""
+        Item {
           width: parent.width
-          text: root.error
-          textFormat: Text.PlainText
-          wrapMode: Text.Wrap
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          color: root.colorFor("failing")
-        }
+          height: Math.max(headerTitle.implicitHeight, headerBadge.implicitHeight)
 
-        Text {
-          visible: root.loaded && root.error === "" && root.prs.length === 0
-          text: "No open pull requests"
-          textFormat: Text.PlainText
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          color: Commons.Color.muted
-        }
+          Text {
+            id: headerTitle
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.settingsOpen ? "Settings" : "Pull Requests"
+            textFormat: Text.PlainText
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.title
+            font.bold: true
+            color: root.foreground
+          }
 
-        Repeater {
-          model: root.error === "" ? root.prSections : []
+          Row {
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Style.space(8)
 
-          delegate: Column {
-            id: section
-            required property var modelData
-            width: prList.width
-            spacing: Style.space(4)
-
-            Row {
-              spacing: Style.space(6)
-
-              StatusBadge {
-                anchors.verticalCenter: parent.verticalCenter
-                status: section.modelData.status
-                label: String(section.modelData.prs.length)
-                size: Style.font.caption
-                // Larger than the row dot, so a Section stands out from its PRs.
-                dotSize: Math.round(Style.font.caption * 0.8)
-              }
-
-              PanelSectionHeader {
-                anchors.verticalCenter: parent.verticalCenter
-                text: section.modelData.title
-                foreground: root.foreground
-              }
+            StatusBadge {
+              id: headerBadge
+              anchors.verticalCenter: parent.verticalCenter
+              visible: root.badgeStatus !== "none"
+              status: root.badgeStatus
+              label: root.badgeLabel
             }
 
-            Repeater {
-              model: section.modelData.prs
+            PanelActionButton {
+              anchors.verticalCenter: parent.verticalCenter
+              iconText: root.settingsOpen ? root.iconBack : root.iconSettings
+              tooltipText: root.settingsOpen ? "Back" : "Settings"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              onClicked: root.settingsOpen ? root.closeSettings() : root.openSettings()
+            }
+          }
+        }
 
-              delegate: Rectangle {
-                id: row
-                required property var modelData
-                width: section.width
-                height: rowContent.implicitHeight + Style.space(8)
-                radius: Style.space(4)
-                color: rowMouse.containsMouse ? Style.hoverFillFor(root.foreground) : "transparent"
+        PanelSeparator { width: parent.width }
+      }
 
-                Row {
-                  id: rowContent
-                  anchors.left: parent.left
-                  anchors.right: parent.right
-                  anchors.leftMargin: Style.space(4)
-                  anchors.rightMargin: Style.space(4)
+      Flickable {
+        id: scroller
+        anchors.top: header.bottom
+        anchors.topMargin: header.spacing
+        anchors.bottom: parent.bottom
+        width: parent.width
+        contentHeight: root.settingsOpen ? settingsView.implicitHeight : prList.implicitHeight
+        // Leaves room for the scrollbar when the content overflows.
+        readonly property real pageWidth: width - (contentHeight > height ? Style.space(10) : 0)
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
+
+        ScrollBar.vertical: ScrollBar {
+          policy: ScrollBar.AsNeeded
+          // A custom handle loses the style's auto-hide, so hide it while the list fits.
+          visible: size < 1.0
+          contentItem: Rectangle {
+            implicitWidth: Style.space(3)
+            radius: width / 2
+            color: Util.alpha(root.foreground, 0.3)
+          }
+        }
+
+        SettingsView {
+          id: settingsView
+          visible: root.settingsOpen
+          width: scroller.pageWidth
+          panel: root
+        }
+
+        Column {
+          id: prList
+          visible: !root.settingsOpen
+          width: scroller.pageWidth
+          spacing: Style.space(10)
+
+          Text {
+            visible: root.error !== ""
+            width: parent.width
+            text: root.error
+            textFormat: Text.PlainText
+            wrapMode: Text.Wrap
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            color: root.colorFor("failing")
+          }
+
+          Text {
+            visible: root.loaded && root.error === "" && root.prs.length === 0
+            text: "No open pull requests"
+            textFormat: Text.PlainText
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+            color: Commons.Color.muted
+          }
+
+          Repeater {
+            model: root.error === "" ? root.prSections : []
+
+            delegate: Column {
+              id: section
+              required property var modelData
+              width: prList.width
+              spacing: Style.space(4)
+
+              Row {
+                spacing: Style.space(6)
+
+                StatusBadge {
                   anchors.verticalCenter: parent.verticalCenter
-                  spacing: Style.space(8)
-
-                  StatusDot {
-                    anchors.verticalCenter: parent.verticalCenter
-                    status: row.modelData.status
-                    size: Math.round(Style.font.caption * 0.5)
-                  }
-
-                  RowIcon {
-                    visible: row.modelData.aiReviewDone
-                    text: root.iconAiReview
-                  }
-
-                  RowIcon {
-                    visible: text !== ""
-                    text: root.reviewDecisionIcon(row.modelData.reviewDecision)
-                  }
-
-                  RowIcon {
-                    visible: row.modelData.unresolvedThreadCount > 0
-                    text: root.iconUnresolvedThreads + " " + row.modelData.unresolvedThreadCount
-                  }
-
-                  RowIcon {
-                    visible: row.modelData.hasConflict
-                    text: root.iconConflict
-                  }
-
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: row.modelData.repo + "#" + row.modelData.number
-                    textFormat: Text.PlainText
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.bodySmall
-                    color: Commons.Color.muted
-                  }
-
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: rowContent.width - x - (draftLabel.visible ? draftLabel.width + rowContent.spacing : 0)
-                    text: row.modelData.title
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    color: root.foreground
-                  }
-
-                  Text {
-                    id: draftLabel
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: row.modelData.isDraft
-                    text: "draft"
-                    textFormat: Text.PlainText
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    font.italic: true
-                    color: Commons.Color.muted
-                  }
+                  status: section.modelData.status
+                  label: String(section.modelData.prs.length)
+                  size: Style.font.caption
+                  // Larger than the row dot, so a Section stands out from its PRs.
+                  dotSize: Math.round(Style.font.caption * 0.8)
                 }
 
-                MouseArea {
-                  id: rowMouse
-                  anchors.fill: parent
-                  hoverEnabled: true
-                  cursorShape: Qt.PointingHandCursor
-                  onClicked: {
-                    Qt.openUrlExternally(row.modelData.url)
-                    root.close()
+                PanelSectionHeader {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: section.modelData.title
+                  foreground: root.foreground
+                }
+              }
+
+              Repeater {
+                model: section.modelData.prs
+
+                delegate: Rectangle {
+                  id: row
+                  required property var modelData
+                  width: section.width
+                  height: rowContent.implicitHeight + Style.space(8)
+                  radius: Style.space(4)
+                  color: rowMouse.containsMouse ? Style.hoverFillFor(root.foreground) : "transparent"
+
+                  Row {
+                    id: rowContent
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: Style.space(4)
+                    anchors.rightMargin: Style.space(4)
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(8)
+
+                    StatusDot {
+                      anchors.verticalCenter: parent.verticalCenter
+                      status: row.modelData.status
+                      size: Math.round(Style.font.caption * 0.5)
+                    }
+
+                    RowIcon {
+                      visible: row.modelData.aiReviewDone
+                      text: root.iconAiReview
+                    }
+
+                    RowIcon {
+                      visible: text !== ""
+                      text: root.reviewDecisionIcon(row.modelData.reviewDecision)
+                    }
+
+                    RowIcon {
+                      visible: row.modelData.unresolvedThreadCount > 0
+                      text: root.iconUnresolvedThreads + " " + row.modelData.unresolvedThreadCount
+                    }
+
+                    RowIcon {
+                      visible: row.modelData.hasConflict
+                      text: root.iconConflict
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: row.modelData.repo + "#" + row.modelData.number
+                      textFormat: Text.PlainText
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                      color: Commons.Color.muted
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      width: rowContent.width - x - (draftLabel.visible ? draftLabel.width + rowContent.spacing : 0)
+                      text: row.modelData.title
+                      textFormat: Text.PlainText
+                      elide: Text.ElideRight
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      color: root.foreground
+                    }
+
+                    Text {
+                      id: draftLabel
+                      anchors.verticalCenter: parent.verticalCenter
+                      visible: row.modelData.isDraft
+                      text: "draft"
+                      textFormat: Text.PlainText
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.italic: true
+                      color: Commons.Color.muted
+                    }
+                  }
+
+                  MouseArea {
+                    id: rowMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                      Qt.openUrlExternally(row.modelData.url)
+                      root.close()
+                    }
                   }
                 }
               }
