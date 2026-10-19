@@ -45,6 +45,7 @@ const prNode = (overrides) => Object.assign({
   url: 'https://github.com/acme/app/pull/7',
   isDraft: false,
   updatedAt: '2026-10-19T10:00:00Z',
+  reviewDecision: 'APPROVED',
   repository: { nameWithOwner: 'acme/app' },
   commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [run('COMPLETED', 'FAILURE')] } } } }] }
 }, overrides)
@@ -62,7 +63,8 @@ describe('parseRun success', () => {
         isDraft: false,
         updatedAt: '2026-10-19T10:00:00Z',
         status: 'failing',
-        aiReviewDone: false
+        aiReviewDone: false,
+        reviewDecision: 'APPROVED'
       }],
       error: ''
     })
@@ -221,6 +223,26 @@ describe('finishedCi', () => {
 
   it('ignores everything on the first poll', () => {
     assert.deepEqual(P.finishedCi(null, [ci(1, 'passing')]), [])
+  })
+})
+
+const reviewDecisionFor = (reviewDecision) => P.parseRun(0, response([prNode({ reviewDecision })]), '', '').prs[0].reviewDecision
+
+describe('parseRun review decision', () => {
+  it('keeps every review decision GitHub returns', () => {
+    for (const decision of ['APPROVED', 'CHANGES_REQUESTED', 'REVIEW_REQUIRED']) {
+      assert.equal(reviewDecisionFor(decision), decision)
+    }
+  })
+
+  it('is null when the repo requires no review', () => {
+    assert.equal(reviewDecisionFor(null), null)
+  })
+})
+
+describe('QUERY', () => {
+  it('reads the review decision', () => {
+    assert.match(P.QUERY, /\breviewDecision\b/)
   })
 })
 
