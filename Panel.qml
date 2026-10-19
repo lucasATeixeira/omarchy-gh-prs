@@ -320,8 +320,8 @@ Panel {
                 status: section.modelData.status
                 label: String(section.modelData.prs.length)
                 size: Style.font.caption
-                // Twice the row dot, so a Section stands out from its PRs.
-                dotSize: Style.font.caption
+                // Larger than the row dot, so a Section stands out from its PRs.
+                dotSize: Math.round(Style.font.caption * 0.8)
               }
 
               PanelSectionHeader {

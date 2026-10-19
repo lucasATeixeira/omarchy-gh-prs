@@ -43,7 +43,7 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 - Max height: 60% of the screen height; below that it fits its content.
 - Header: "Pull Requests" plus the Bar summary as `● 1`. It stays fixed; only the Sections scroll.
 - A thin scrollbar on the right appears only when the list overflows.
-- Sections, in order: Failing, Running, Passing, No CI. Empty Sections are hidden. Each Section header shows its dot (~10px, twice the row dot) and PR count. Inside a Section, the most recently updated PR comes first.
+- Sections, in order: Failing, Running, Passing, No CI. Empty Sections are hidden. Each Section header shows its dot (~8px, larger than the row dot) and PR count. Inside a Section, the most recently updated PR comes first.
 - Row: a small Status dot (~5px), `owner/repo#123`, the title elided with "…", and a "draft" label after the title when the PR is a draft. Clicking a row opens the PR in the browser and closes the popup.
 - Before the first fetch ends: no list and no empty message.
 - Zero PRs: "No open pull requests".
