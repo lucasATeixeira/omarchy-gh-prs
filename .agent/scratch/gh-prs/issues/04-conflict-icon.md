@@ -1,6 +1,6 @@
 # 04 - Conflict icon
 
-Status: ready-for-agent
+Status: resolved
 
 Blocked by: 03
 
@@ -12,13 +12,17 @@ Show a **Conflict** icon on the row when the PR cannot merge because of conflict
 
 ## Acceptance criteria
 
-- [ ] `QUERY` reads `mergeable`.
-- [ ] `PullRequest` gets a boolean that is true only when `mergeable` is `CONFLICTING`, set in `toPullRequest`.
-- [ ] The row shows `nf-md-alert` in the normal text color and `Style.font.caption`.
-- [ ] `MERGEABLE` and `UNKNOWN` show no icon and take no space.
-- [ ] Tests cover `CONFLICTING`, `MERGEABLE`, and `UNKNOWN`.
+- [x] `QUERY` reads `mergeable`.
+- [x] `PullRequest` gets a boolean that is true only when `mergeable` is `CONFLICTING`, set in `toPullRequest`.
+- [x] The row shows `nf-md-alert` in the normal text color and `Style.font.caption`.
+- [x] `MERGEABLE` and `UNKNOWN` show no icon and take no space.
+- [x] Tests cover `CONFLICTING`, `MERGEABLE`, and `UNKNOWN`.
 - [ ] Checked by hand after `omarchy restart shell`.
 
 ## Notes
 
 - Blocked by 03 only to keep the row order edits in sequence.
+
+## Comments
+
+Implemented on branch `ci-review-icons`. The hand check after `omarchy restart shell` is left to the user.
