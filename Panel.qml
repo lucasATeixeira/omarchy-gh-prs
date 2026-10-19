@@ -122,13 +122,14 @@ Panel {
     property string status: "none"
     property string label: ""
     property real size: Style.font.body
+    property real dotSize: Math.round(size * 0.7)
 
     spacing: Math.round(size * 0.35)
 
     StatusDot {
       anchors.verticalCenter: parent.verticalCenter
       status: badge.status
-      size: Math.round(badge.size * 0.7)
+      size: badge.dotSize
     }
 
     Text {
@@ -312,6 +313,8 @@ Panel {
                 status: section.modelData.status
                 label: String(section.modelData.prs.length)
                 size: Style.font.caption
+                // Twice the row dot, so a Section stands out from its PRs.
+                dotSize: Style.font.caption
               }
 
               PanelSectionHeader {
