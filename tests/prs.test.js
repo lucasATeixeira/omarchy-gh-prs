@@ -205,28 +205,35 @@ describe('finishedAiReviews', () => {
   })
 })
 
-const ci = (number, status) => Object.assign(pr(status, undefined, number), { url: 'u' + number })
+const prWithCi = (number, status) => Object.assign(pr(status), { number, url: 'u' + number })
 
 describe('finishedCi', () => {
   it('lists PRs whose CI went from running to passing or failing', () => {
-    const previous = [ci(1, 'running'), ci(2, 'running')]
-    const current = [ci(1, 'passing'), ci(2, 'failing')]
+    const previous = [prWithCi(1, 'running'), prWithCi(2, 'running')]
+    const current = [prWithCi(1, 'passing'), prWithCi(2, 'failing')]
     assert.deepEqual(P.finishedCi(previous, current).map(p => p.number), [1, 2])
   })
 
   it('ignores every other status change', () => {
     const changes = [['passing', 'failing'], ['failing', 'passing'], ['running', 'none'], ['running', 'running']]
     for (const [before, now] of changes) {
-      assert.deepEqual(P.finishedCi([ci(1, before)], [ci(1, now)]), [], before + ' -> ' + now)
+      assert.deepEqual(P.finishedCi([prWithCi(1, before)], [prWithCi(1, now)]), [], before + ' -> ' + now)
     }
   })
 
   it('ignores PRs seen for the first time', () => {
-    assert.deepEqual(P.finishedCi([ci(1, 'running')], [ci(2, 'passing')]), [])
+    assert.deepEqual(P.finishedCi([prWithCi(1, 'running')], [prWithCi(2, 'passing')]), [])
   })
 
   it('ignores everything on the first poll', () => {
-    assert.deepEqual(P.finishedCi(null, [ci(1, 'passing')]), [])
+    assert.deepEqual(P.finishedCi(null, [prWithCi(1, 'passing')]), [])
+  })
+})
+
+describe('ciNotificationTitle', () => {
+  it('says whether CI passed or failed', () => {
+    assert.equal(P.ciNotificationTitle('passing'), 'CI passed')
+    assert.equal(P.ciNotificationTitle('failing'), 'CI failed')
   })
 })
 
@@ -283,7 +290,7 @@ describe('QUERY', () => {
   })
 
   it('reads whether each review thread is resolved', () => {
-    assert.match(P.QUERY, /reviewThreads\(first: 100\) \{ nodes \{ isResolved \} \}/)
+    assert.match(P.QUERY, /reviewThreads\(first: 100\)[^}]*\bisResolved\b/)
   })
 
   it('reads whether the PR can merge', () => {

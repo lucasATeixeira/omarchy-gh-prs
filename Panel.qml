@@ -14,14 +14,14 @@ Panel {
   moduleName: "lucas.gh-prs"
   ipcTarget: "lucas.gh-prs"
 
-  // nf-fa-github, the multiplication sign shown on error, nf-md-robot, nf-md-check_circle, nf-md-file_document_edit, nf-md-comment_outline, and nf-md-alert.
-  readonly property string iconGithub: ""
+  readonly property string iconGithub: "" // nf-fa-github
   readonly property string iconError: "✕"
-  readonly property string iconAiReview: "󰚩"
-  readonly property string iconApproved: "󰗠"
-  readonly property string iconChangesRequested: "󰷈"
-  readonly property string iconUnresolvedThreads: "󰆂"
-  readonly property string iconConflict: "󰀦"
+  readonly property string iconAiReview: "󰚩" // nf-md-robot
+  readonly property string iconApproved: "󰗠" // nf-md-check_circle
+  readonly property string iconChangesRequested: "󰷈" // nf-md-file_document_edit
+  readonly property string iconUnresolvedThreads: "󰆂" // nf-md-comment_outline
+  readonly property string iconConflict: "󰀦" // nf-md-alert
+  readonly property var reviewDecisionIcons: ({ APPROVED: iconApproved, CHANGES_REQUESTED: iconChangesRequested })
 
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
@@ -45,9 +45,7 @@ Panel {
 
   // Empty when the review decision has no icon.
   function reviewDecisionIcon(decision) {
-    if (decision === "APPROVED") return iconApproved
-    if (decision === "CHANGES_REQUESTED") return iconChangesRequested
-    return ""
+    return reviewDecisionIcons[decision] || ""
   }
 
   function refresh() {
@@ -87,7 +85,7 @@ Panel {
           root.notify(root.iconAiReview, "AI review done", pr)
         })
         Prs.finishedCi(root.lastPrs, result.prs).forEach(function(pr) {
-          root.notify(root.iconGithub, pr.status === "passing" ? "CI passed" : "CI failed", pr)
+          root.notify(root.iconGithub, Prs.ciNotificationTitle(pr.status), pr)
         })
         root.lastPrs = result.prs
       }
@@ -113,6 +111,15 @@ Panel {
     height: size
     radius: size / 2
     color: root.colorFor(status)
+  }
+
+  // A small icon in a PR row.
+  component RowIcon: Text {
+    anchors.verticalCenter: parent.verticalCenter
+    textFormat: Text.PlainText
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.caption
+    color: root.foreground
   }
 
   // A colored dot followed by a count, or by the error mark.
@@ -347,44 +354,24 @@ Panel {
                     size: Math.round(Style.font.caption * 0.5)
                   }
 
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
+                  RowIcon {
                     visible: row.modelData.aiReviewDone
                     text: root.iconAiReview
-                    textFormat: Text.PlainText
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    color: root.foreground
                   }
 
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
+                  RowIcon {
                     visible: text !== ""
                     text: root.reviewDecisionIcon(row.modelData.reviewDecision)
-                    textFormat: Text.PlainText
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    color: root.foreground
                   }
 
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
+                  RowIcon {
                     visible: row.modelData.unresolvedThreadCount > 0
                     text: root.iconUnresolvedThreads + " " + row.modelData.unresolvedThreadCount
-                    textFormat: Text.PlainText
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    color: root.foreground
                   }
 
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
+                  RowIcon {
                     visible: row.modelData.hasConflict
                     text: root.iconConflict
-                    textFormat: Text.PlainText
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    color: root.foreground
                   }
 
                   Text {

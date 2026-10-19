@@ -30,7 +30,7 @@
  * @property {boolean} aiReviewDone
  * @property {?ReviewDecision} reviewDecision Null when the repo requires no review.
  * @property {number} unresolvedThreadCount
- * @property {boolean} hasConflict True when the branch conflicts with the base branch.
+ * @property {boolean} hasConflict
  */
 
 /**
@@ -157,7 +157,7 @@ function sections(prs) {
         .filter(function (section) { return section.prs.length > 0; });
 }
 
-/** GraphQL query for the user's 50 most recently updated open PRs, their review decision, threads, and mergeability, and their latest commit's checks. */
+/** GraphQL query for the user's 50 most recently updated open PRs and the fields each row shows. */
 var QUERY = "query { search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) {"
     + " nodes { ... on PullRequest { number title url isDraft updatedAt reviewDecision mergeable repository { nameWithOwner }"
     + " reviewThreads(first: 100) { nodes { isResolved } }"
@@ -228,6 +228,15 @@ function finishedCi(previousPrs, currentPrs) {
 }
 
 /**
+ * Title of the notification sent when a PR's CI finishes.
+ * @param {Status} status "passing" or "failing".
+ * @returns {string}
+ */
+function ciNotificationTitle(status) {
+    return status === "passing" ? "CI passed" : "CI failed";
+}
+
+/**
  * Current PRs that `changed` accepts against the same PR, matched by URL, in the previous poll.
  * @param {?PullRequest[]} previousPrs
  * @param {PullRequest[]} currentPrs
@@ -291,6 +300,7 @@ if (typeof module !== "undefined") {
         parseRun: parseRun,
         finishedAiReviews: finishedAiReviews,
         finishedCi: finishedCi,
+        ciNotificationTitle: ciNotificationTitle,
         barSummary: barSummary,
         sections: sections,
         errorMessage: errorMessage,
