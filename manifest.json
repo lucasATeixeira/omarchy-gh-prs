@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "lucas.gh-prs",
+  "name": "GitHub PRs",
+  "version": "1.0.0",
+  "author": "Lucas",
+  "license": "MIT",
+  "description": "Your open GitHub pull requests with their CI status. Needs the gh CLI, logged in with gh auth login.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "GitHub PRs",
+    "description": "Worst CI status of your open PRs; click for the full list",
+    "category": "Apps",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 10
+    },
+    "schema": [
+      { "key": "refreshIntervalSec", "type": "number", "label": "Refresh interval (seconds)" }
+    ]
+  }
+}
