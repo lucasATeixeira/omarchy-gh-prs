@@ -15,6 +15,8 @@
 
 /** @typedef {"failing"|"running"|"passing"|"none"} Status */
 
+/** @typedef {"APPROVED"|"CHANGES_REQUESTED"|"REVIEW_REQUIRED"} ReviewDecision */
+
 /**
  * An open pull request as the widget shows it.
  * @typedef {Object} PullRequest
@@ -26,6 +28,9 @@
  * @property {string} updatedAt ISO 8601 timestamp.
  * @property {Status} status
  * @property {boolean} aiReviewDone
+ * @property {?ReviewDecision} reviewDecision Null when the repo requires no review.
+ * @property {number} unresolvedThreadCount
+ * @property {boolean} hasConflict
  */
 
 /**
@@ -152,9 +157,10 @@ function sections(prs) {
         .filter(function (section) { return section.prs.length > 0; });
 }
 
-/** GraphQL query for the user's 50 most recently updated open PRs and their latest commit's checks. */
+/** GraphQL query for the user's 50 most recently updated open PRs and the fields each row shows. */
 var QUERY = "query { search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) {"
-    + " nodes { ... on PullRequest { number title url isDraft updatedAt repository { nameWithOwner }"
+    + " nodes { ... on PullRequest { number title url isDraft updatedAt reviewDecision mergeable repository { nameWithOwner }"
+    + " reviewThreads(first: 100) { nodes { isResolved } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
     + " __typename ... on CheckRun { name status conclusion } ... on StatusContext { context state } } } } } } } } } } }";
 
@@ -188,7 +194,10 @@ function toPullRequest(node, aiCheckPatterns) {
         isDraft: node.isDraft,
         updatedAt: node.updatedAt,
         status: prStatus(checks),
-        aiReviewDone: aiReviewDone(checks, aiCheckPatterns)
+        aiReviewDone: aiReviewDone(checks, aiCheckPatterns),
+        reviewDecision: node.reviewDecision,
+        unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length,
+        hasConflict: node.mergeable === "CONFLICTING"
     };
 }
 
@@ -200,10 +209,46 @@ function toPullRequest(node, aiCheckPatterns) {
  * @returns {PullRequest[]}
  */
 function finishedAiReviews(previousPrs, currentPrs) {
-    var notDoneUrls = (previousPrs || [])
-        .filter(function (pr) { return !pr.aiReviewDone; })
-        .map(function (pr) { return pr.url; });
-    return currentPrs.filter(function (pr) { return pr.aiReviewDone && notDoneUrls.indexOf(pr.url) !== -1; });
+    return changedSincePoll(previousPrs, currentPrs, function (before, now) {
+        return !before.aiReviewDone && now.aiReviewDone;
+    });
+}
+
+/**
+ * PRs whose CI finished: running in the previous poll, and failing or passing now.
+ * A PR missing from the previous poll is skipped, and so is every PR on the first poll.
+ * @param {?PullRequest[]} previousPrs Null before the first successful poll.
+ * @param {PullRequest[]} currentPrs
+ * @returns {PullRequest[]}
+ */
+function finishedCi(previousPrs, currentPrs) {
+    return changedSincePoll(previousPrs, currentPrs, function (before, now) {
+        return before.status === "running" && (now.status === "failing" || now.status === "passing");
+    });
+}
+
+/**
+ * Title of the notification sent when a PR's CI finishes.
+ * @param {Status} status "passing" or "failing".
+ * @returns {string}
+ */
+function ciNotificationTitle(status) {
+    return status === "passing" ? "CI passed" : "CI failed";
+}
+
+/**
+ * Current PRs that `changed` accepts against the same PR, matched by URL, in the previous poll.
+ * @param {?PullRequest[]} previousPrs
+ * @param {PullRequest[]} currentPrs
+ * @param {function(PullRequest, PullRequest): boolean} changed Gets the previous and the current PR.
+ * @returns {PullRequest[]}
+ */
+function changedSincePoll(previousPrs, currentPrs, changed) {
+    var previous = previousPrs || [];
+    return currentPrs.filter(function (now) {
+        var before = previous.find(function (pr) { return pr.url === now.url; });
+        return before !== undefined && changed(before, now);
+    });
 }
 
 /**
@@ -254,6 +299,8 @@ if (typeof module !== "undefined") {
         prStatus: prStatus,
         parseRun: parseRun,
         finishedAiReviews: finishedAiReviews,
+        finishedCi: finishedCi,
+        ciNotificationTitle: ciNotificationTitle,
         barSummary: barSummary,
         sections: sections,
         errorMessage: errorMessage,

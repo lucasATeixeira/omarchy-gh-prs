@@ -14,10 +14,14 @@ Panel {
   moduleName: "lucas.gh-prs"
   ipcTarget: "lucas.gh-prs"
 
-  // nf-fa-github, the multiplication sign shown on error, and nf-md-robot.
-  readonly property string iconGithub: ""
+  readonly property string iconGithub: "" // nf-fa-github
   readonly property string iconError: "✕"
-  readonly property string iconAiReview: "󰚩"
+  readonly property string iconAiReview: "󰚩" // nf-md-robot
+  readonly property string iconApproved: "󰗠" // nf-md-check_circle
+  readonly property string iconChangesRequested: "󰷈" // nf-md-file_document_edit
+  readonly property string iconUnresolvedThreads: "󰆂" // nf-md-comment_outline
+  readonly property string iconConflict: "󰀦" // nf-md-alert
+  readonly property var reviewDecisionIcons: ({ APPROVED: iconApproved, CHANGES_REQUESTED: iconChangesRequested })
 
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
@@ -39,16 +43,22 @@ Panel {
     return colors[status] || Commons.Color.muted
   }
 
+  // Empty when the review decision has no icon.
+  function reviewDecisionIcon(decision) {
+    return reviewDecisionIcons[decision] || ""
+  }
+
   function refresh() {
     if (fetchProc.running) return
     themeFile.reload()
     fetchProc.running = true
   }
 
-  function notifyAiReviewDone(pr) {
+  // Sends a desktop notification about a PR; clicking it opens the PR.
+  function notify(icon, title, pr) {
     Util.execArgv([
-      "omarchy-notification-send", "--app-name", "GitHub PRs", "-g", iconAiReview,
-      "AI review done", pr.repo + "#" + pr.number + " — " + pr.title,
+      "omarchy-notification-send", "--app-name", "GitHub PRs", "-g", icon,
+      title, pr.repo + "#" + pr.number + " — " + pr.title,
       "--exec", "xdg-open", pr.url
     ])
   }
@@ -71,7 +81,12 @@ Panel {
       var result = Prs.parseRun(exitCode, String(fetchStdout.text), String(fetchStderr.text),
                                 String(root.setting("aiCheckNames", "CodeRabbit")))
       if (result.error === "") {
-        Prs.finishedAiReviews(root.lastPrs, result.prs).forEach(root.notifyAiReviewDone)
+        Prs.finishedAiReviews(root.lastPrs, result.prs).forEach(function(pr) {
+          root.notify(root.iconAiReview, "AI review done", pr)
+        })
+        Prs.finishedCi(root.lastPrs, result.prs).forEach(function(pr) {
+          root.notify(root.iconGithub, Prs.ciNotificationTitle(pr.status), pr)
+        })
         root.lastPrs = result.prs
       }
       root.prs = result.prs
@@ -98,6 +113,15 @@ Panel {
     color: root.colorFor(status)
   }
 
+  // A small icon in a PR row.
+  component RowIcon: Text {
+    anchors.verticalCenter: parent.verticalCenter
+    textFormat: Text.PlainText
+    font.family: root.fontFamily
+    font.pixelSize: Style.font.caption
+    color: root.foreground
+  }
+
   // A colored dot followed by a count, or by the error mark.
   component StatusBadge: Row {
     id: badge
@@ -105,13 +129,14 @@ Panel {
     property string status: "none"
     property string label: ""
     property real size: Style.font.body
+    property real dotSize: Math.round(size * 0.7)
 
     spacing: Math.round(size * 0.35)
 
     StatusDot {
       anchors.verticalCenter: parent.verticalCenter
       status: badge.status
-      size: Math.round(badge.size * 0.7)
+      size: badge.dotSize
     }
 
     Text {
@@ -295,6 +320,8 @@ Panel {
                 status: section.modelData.status
                 label: String(section.modelData.prs.length)
                 size: Style.font.caption
+                // Larger than the row dot, so a Section stands out from its PRs.
+                dotSize: Math.round(Style.font.caption * 0.8)
               }
 
               PanelSectionHeader {
@@ -330,14 +357,24 @@ Panel {
                     size: Math.round(Style.font.caption * 0.5)
                   }
 
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
+                  RowIcon {
                     visible: row.modelData.aiReviewDone
                     text: root.iconAiReview
-                    textFormat: Text.PlainText
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.bodySmall
-                    color: root.foreground
+                  }
+
+                  RowIcon {
+                    visible: text !== ""
+                    text: root.reviewDecisionIcon(row.modelData.reviewDecision)
+                  }
+
+                  RowIcon {
+                    visible: row.modelData.unresolvedThreadCount > 0
+                    text: root.iconUnresolvedThreads + " " + row.modelData.unresolvedThreadCount
+                  }
+
+                  RowIcon {
+                    visible: row.modelData.hasConflict
+                    text: root.iconConflict
                   }
 
                   Text {

@@ -45,6 +45,9 @@ const prNode = (overrides) => Object.assign({
   url: 'https://github.com/acme/app/pull/7',
   isDraft: false,
   updatedAt: '2026-10-19T10:00:00Z',
+  reviewDecision: 'APPROVED',
+  reviewThreads: { nodes: [] },
+  mergeable: 'MERGEABLE',
   repository: { nameWithOwner: 'acme/app' },
   commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [run('COMPLETED', 'FAILURE')] } } } }] }
 }, overrides)
@@ -62,7 +65,10 @@ describe('parseRun success', () => {
         isDraft: false,
         updatedAt: '2026-10-19T10:00:00Z',
         status: 'failing',
-        aiReviewDone: false
+        aiReviewDone: false,
+        reviewDecision: 'APPROVED',
+        unresolvedThreadCount: 0,
+        hasConflict: false
       }],
       error: ''
     })
@@ -196,6 +202,99 @@ describe('finishedAiReviews', () => {
 
   it('ignores everything on the first poll', () => {
     assert.deepEqual(P.finishedAiReviews(null, [reviewed(1, true)]), [])
+  })
+})
+
+const prWithCi = (number, status) => Object.assign(pr(status), { number, url: 'u' + number })
+
+describe('finishedCi', () => {
+  it('lists PRs whose CI went from running to passing or failing', () => {
+    const previous = [prWithCi(1, 'running'), prWithCi(2, 'running')]
+    const current = [prWithCi(1, 'passing'), prWithCi(2, 'failing')]
+    assert.deepEqual(P.finishedCi(previous, current).map(p => p.number), [1, 2])
+  })
+
+  it('ignores every other status change', () => {
+    const changes = [['passing', 'failing'], ['failing', 'passing'], ['running', 'none'], ['running', 'running']]
+    for (const [before, now] of changes) {
+      assert.deepEqual(P.finishedCi([prWithCi(1, before)], [prWithCi(1, now)]), [], before + ' -> ' + now)
+    }
+  })
+
+  it('ignores PRs seen for the first time', () => {
+    assert.deepEqual(P.finishedCi([prWithCi(1, 'running')], [prWithCi(2, 'passing')]), [])
+  })
+
+  it('ignores everything on the first poll', () => {
+    assert.deepEqual(P.finishedCi(null, [prWithCi(1, 'passing')]), [])
+  })
+})
+
+describe('ciNotificationTitle', () => {
+  it('says whether CI passed or failed', () => {
+    assert.equal(P.ciNotificationTitle('passing'), 'CI passed')
+    assert.equal(P.ciNotificationTitle('failing'), 'CI failed')
+  })
+})
+
+const reviewDecisionFor = (reviewDecision) => P.parseRun(0, response([prNode({ reviewDecision })]), '', '').prs[0].reviewDecision
+
+describe('parseRun review decision', () => {
+  it('keeps every review decision GitHub returns', () => {
+    for (const decision of ['APPROVED', 'CHANGES_REQUESTED', 'REVIEW_REQUIRED']) {
+      assert.equal(reviewDecisionFor(decision), decision)
+    }
+  })
+
+  it('is null when the repo requires no review', () => {
+    assert.equal(reviewDecisionFor(null), null)
+  })
+})
+
+const thread = (isResolved) => ({ isResolved })
+const unresolvedThreadCountFor = (threads) => P.parseRun(0, response([prNode({ reviewThreads: { nodes: threads } })]), '', '').prs[0].unresolvedThreadCount
+
+describe('parseRun unresolved threads', () => {
+  it('is 0 when the PR has no threads', () => {
+    assert.equal(unresolvedThreadCountFor([]), 0)
+  })
+
+  it('is 0 when every thread is resolved', () => {
+    assert.equal(unresolvedThreadCountFor([thread(true), thread(true)]), 0)
+  })
+
+  it('counts only unresolved threads', () => {
+    assert.equal(unresolvedThreadCountFor([thread(false), thread(true), thread(false)]), 2)
+  })
+})
+
+const hasConflictFor = (mergeable) => P.parseRun(0, response([prNode({ mergeable })]), '', '').prs[0].hasConflict
+
+describe('parseRun conflict', () => {
+  it('is true when the PR is conflicting', () => {
+    assert.equal(hasConflictFor('CONFLICTING'), true)
+  })
+
+  it('is false when the PR is mergeable', () => {
+    assert.equal(hasConflictFor('MERGEABLE'), false)
+  })
+
+  it('is false while GitHub has not computed mergeability', () => {
+    assert.equal(hasConflictFor('UNKNOWN'), false)
+  })
+})
+
+describe('QUERY', () => {
+  it('reads the review decision', () => {
+    assert.match(P.QUERY, /\breviewDecision\b/)
+  })
+
+  it('reads whether each review thread is resolved', () => {
+    assert.match(P.QUERY, /reviewThreads\(first: 100\)[^}]*\bisResolved\b/)
+  })
+
+  it('reads whether the PR can merge', () => {
+    assert.match(P.QUERY, /\bmergeable\b/)
   })
 })
 
