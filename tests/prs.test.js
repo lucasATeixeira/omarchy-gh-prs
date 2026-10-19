@@ -47,6 +47,7 @@ const prNode = (overrides) => Object.assign({
   updatedAt: '2026-10-19T10:00:00Z',
   reviewDecision: 'APPROVED',
   reviewThreads: { nodes: [] },
+  mergeable: 'MERGEABLE',
   repository: { nameWithOwner: 'acme/app' },
   commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [run('COMPLETED', 'FAILURE')] } } } }] }
 }, overrides)
@@ -66,7 +67,8 @@ describe('parseRun success', () => {
         status: 'failing',
         aiReviewDone: false,
         reviewDecision: 'APPROVED',
-        unresolvedThreadCount: 0
+        unresolvedThreadCount: 0,
+        hasConflict: false
       }],
       error: ''
     })
@@ -259,6 +261,22 @@ describe('parseRun unresolved threads', () => {
   })
 })
 
+const hasConflictFor = (mergeable) => P.parseRun(0, response([prNode({ mergeable })]), '', '').prs[0].hasConflict
+
+describe('parseRun conflict', () => {
+  it('is true when the PR is conflicting', () => {
+    assert.equal(hasConflictFor('CONFLICTING'), true)
+  })
+
+  it('is false when the PR is mergeable', () => {
+    assert.equal(hasConflictFor('MERGEABLE'), false)
+  })
+
+  it('is false while GitHub has not computed mergeability', () => {
+    assert.equal(hasConflictFor('UNKNOWN'), false)
+  })
+})
+
 describe('QUERY', () => {
   it('reads the review decision', () => {
     assert.match(P.QUERY, /\breviewDecision\b/)
@@ -266,6 +284,10 @@ describe('QUERY', () => {
 
   it('reads whether each review thread is resolved', () => {
     assert.match(P.QUERY, /reviewThreads\(first: 100\) \{ nodes \{ isResolved \} \}/)
+  })
+
+  it('reads whether the PR can merge', () => {
+    assert.match(P.QUERY, /\bmergeable\b/)
   })
 })
 

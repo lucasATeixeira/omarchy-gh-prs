@@ -6,7 +6,7 @@ The bar shows the GitHub icon with a badge: the worst CI status among your PRs a
 
 When a PR's checks stop running and pass or fail, you get a notification. Click it to open the PR.
 
-A PR's row shows a check icon when the PR is approved, and a document icon when changes are requested. A comment icon with a number shows how many review threads are still unresolved.
+A PR's row shows a check icon when the PR is approved, and a document icon when changes are requested. A comment icon with a number shows how many review threads are still unresolved. An alert icon shows when the PR has merge conflicts.
 
 ## Requirements
 
