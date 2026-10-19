@@ -46,6 +46,7 @@ const prNode = (overrides) => Object.assign({
   isDraft: false,
   updatedAt: '2026-10-19T10:00:00Z',
   reviewDecision: 'APPROVED',
+  reviewThreads: { nodes: [] },
   repository: { nameWithOwner: 'acme/app' },
   commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [run('COMPLETED', 'FAILURE')] } } } }] }
 }, overrides)
@@ -64,7 +65,8 @@ describe('parseRun success', () => {
         updatedAt: '2026-10-19T10:00:00Z',
         status: 'failing',
         aiReviewDone: false,
-        reviewDecision: 'APPROVED'
+        reviewDecision: 'APPROVED',
+        unresolvedThreadCount: 0
       }],
       error: ''
     })
@@ -240,9 +242,30 @@ describe('parseRun review decision', () => {
   })
 })
 
+const thread = (isResolved) => ({ isResolved })
+const unresolvedThreadCountFor = (threads) => P.parseRun(0, response([prNode({ reviewThreads: { nodes: threads } })]), '', '').prs[0].unresolvedThreadCount
+
+describe('parseRun unresolved threads', () => {
+  it('is 0 when the PR has no threads', () => {
+    assert.equal(unresolvedThreadCountFor([]), 0)
+  })
+
+  it('is 0 when every thread is resolved', () => {
+    assert.equal(unresolvedThreadCountFor([thread(true), thread(true)]), 0)
+  })
+
+  it('counts only unresolved threads', () => {
+    assert.equal(unresolvedThreadCountFor([thread(false), thread(true), thread(false)]), 2)
+  })
+})
+
 describe('QUERY', () => {
   it('reads the review decision', () => {
     assert.match(P.QUERY, /\breviewDecision\b/)
+  })
+
+  it('reads whether each review thread is resolved', () => {
+    assert.match(P.QUERY, /reviewThreads\(first: 100\) \{ nodes \{ isResolved \} \}/)
   })
 })
 
