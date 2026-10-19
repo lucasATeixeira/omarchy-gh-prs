@@ -51,3 +51,6 @@ Click the gear in the popup header to change the settings. Changes apply right a
 - Saving a file does not reliably reload the running widget. Run `omarchy restart shell` to see QML changes.
 
 The spec lives in `.agent/scratch/gh-prs/spec.md`, and the domain terms are defined in `.agent/GLOSSARY.md`.
+
+# Ideas
+- Add a refresh button
