@@ -17,3 +17,11 @@
 **Section**: a titled group of PRs in the popup that share one Status. Titles: Failing, Running, Passing, No CI.
 
 **Status dot**: the small colored circle that shows a Status in a Section header or a PR row.
+
+**CI finished**: a PR whose Status changed from `running` to `failing` or `passing` between two successful polls. _Avoid_: CI done, build finished.
+
+**Review decision**: GitHub's overall review verdict for a PR: approved, changes requested, or review required. _Avoid_: review status, approval state.
+
+**Conflict**: a PR that GitHub says cannot merge because its branch conflicts with the base branch. _Avoid_: merge error.
+
+**Unresolved thread**: a review comment thread on a PR's code that nobody has marked as resolved. _Avoid_: open comment, pending comment.

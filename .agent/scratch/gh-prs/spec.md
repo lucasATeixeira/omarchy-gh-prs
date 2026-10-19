@@ -11,6 +11,7 @@ An Omarchy shell bar widget that shows the CI status of the user's open GitHub p
 
 - The `gh` CLI runs one GraphQL query: open PRs the user authored, across all repos, drafts included, at most 50.
 - CI comes from the latest commit's `statusCheckRollup`. All **Checks** count, not only required ones.
+- The same query also reads each PR's `reviewDecision`, `mergeable`, and review threads' `isResolved`.
 - Polls every 10 seconds (`refreshIntervalSec` in the manifest defaults), plus a refresh when the popup opens.
 - Setup: the user runs `gh auth login` once.
 
@@ -61,6 +62,33 @@ Some repos run an AI code reviewer in CI, such as CodeRabbit. The widget tells t
 - A failed poll does not change the last seen PRs.
 - Bot PR reviews without a Check, such as Copilot's, are out of scope.
 
+## CI notification
+
+The widget tells the user when a PR's **CI finished**, so they do not need to watch the bar while CI runs.
+
+- **CI finished**: the PR's Status was `running` in the last successful poll and is `failing` or `passing` now.
+- A failing Check makes the PR `failing` while other Checks still run, so a failure notifies as soon as it happens.
+- Other changes do not notify: `passing` → `failing`, `failing` → `passing`, and `running` → `none`.
+- Title `CI passed` or `CI failed`, body `owner/repo#123 — <PR title>`. Clicking it opens the PR.
+- One notification per PR. When the AI review is done and CI finished in the same poll, both notifications are sent.
+- Same rules as the AI review notification: none on the first poll after a start, none for a PR seen for the first time, and a failed poll does not change the last seen PRs.
+- Drafts are included. No setting.
+
+## Review and merge icons
+
+Icons on each row show if a PR is ready to merge. They do not change Status, Sections, or the Badge.
+
+- Row order: Status dot, robot, **Review decision** icon, **Unresolved thread** icon with count, **Conflict** icon, then `owner/repo#123`, the title, and "draft".
+- Each icon is hidden when it does not apply, so it takes no space.
+- All row icons, the robot included, use the `caption` font size and the normal text color.
+- Review decision, from the PR's `reviewDecision`:
+  - `APPROVED`: `nf-md-check_circle`.
+  - `CHANGES_REQUESTED`: `nf-md-file_document_edit`.
+  - `REVIEW_REQUIRED` or `null`: no icon.
+- Unresolved threads: `nf-md-comment_outline` followed by the number of review threads with `isResolved` false. Every thread counts: from any author, bots included, outdated included. Plain conversation comments are not counted, because they cannot be resolved. No icon when the count is 0.
+- Conflict: `nf-md-alert` when `mergeable` is `CONFLICTING`. `MERGEABLE` and `UNKNOWN` show no icon.
+- No notifications for review decision, threads, or conflicts.
+
 ## Tests
 
 - Pure logic lives in `js/prs.js` and is tested with `node:test` in `tests/prs.test.js`.
@@ -69,4 +97,6 @@ Some repos run an AI code reviewer in CI, such as CodeRabbit. The widget tells t
 ## Known limits
 
 - Only the first 100 Checks of a PR are read.
+- Only the first 100 review threads of a PR are read, so the Unresolved thread count is at most 100.
+- A Status change that starts and ends between two polls is missed, for example a new commit whose CI finishes in less than one poll interval.
 - The auth hint relies on `gh` printing "gh auth login" in its error output.
