@@ -45,10 +45,11 @@ Panel {
     fetchProc.running = true
   }
 
-  function notifyAiReviewDone(pr) {
+  // Sends a desktop notification about a PR; clicking it opens the PR.
+  function notify(icon, title, pr) {
     Util.execArgv([
-      "omarchy-notification-send", "--app-name", "GitHub PRs", "-g", iconAiReview,
-      "AI review done", pr.repo + "#" + pr.number + " — " + pr.title,
+      "omarchy-notification-send", "--app-name", "GitHub PRs", "-g", icon,
+      title, pr.repo + "#" + pr.number + " — " + pr.title,
       "--exec", "xdg-open", pr.url
     ])
   }
@@ -71,7 +72,12 @@ Panel {
       var result = Prs.parseRun(exitCode, String(fetchStdout.text), String(fetchStderr.text),
                                 String(root.setting("aiCheckNames", "CodeRabbit")))
       if (result.error === "") {
-        Prs.finishedAiReviews(root.lastPrs, result.prs).forEach(root.notifyAiReviewDone)
+        Prs.finishedAiReviews(root.lastPrs, result.prs).forEach(function(pr) {
+          root.notify(root.iconAiReview, "AI review done", pr)
+        })
+        Prs.finishedCi(root.lastPrs, result.prs).forEach(function(pr) {
+          root.notify(root.iconGithub, pr.status === "passing" ? "CI passed" : "CI failed", pr)
+        })
         root.lastPrs = result.prs
       }
       root.prs = result.prs
