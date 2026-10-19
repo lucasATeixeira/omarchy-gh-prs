@@ -14,14 +14,17 @@ Panel {
   moduleName: "lucas.gh-prs"
   ipcTarget: "lucas.gh-prs"
 
-  // nf-fa-github and the multiplication sign shown on error.
+  // nf-fa-github, the multiplication sign shown on error, and nf-md-robot.
   readonly property string iconGithub: ""
   readonly property string iconError: "✕"
+  readonly property string iconAiReview: "󰚩"
 
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
 
   property var prs: []
+  // PRs from the last successful poll; null until the first one.
+  property var lastPrs: null
   property string error: ""
   property bool loaded: false
   property var colors: Prs.DEFAULT_COLORS
@@ -42,6 +45,14 @@ Panel {
     fetchProc.running = true
   }
 
+  function notifyAiReviewDone(pr) {
+    Util.execArgv([
+      "omarchy-notification-send", "--app-name", "GitHub PRs", "-g", iconAiReview,
+      "AI review done", pr.repo + "#" + pr.number + " — " + pr.title,
+      "--exec", "xdg-open", pr.url
+    ])
+  }
+
   onOpenedChanged: if (opened) refresh()
 
   FileView {
@@ -57,7 +68,12 @@ Panel {
     stdout: StdioCollector { id: fetchStdout; waitForEnd: true }
     stderr: StdioCollector { id: fetchStderr; waitForEnd: true }
     onExited: function(exitCode) {
-      var result = Prs.parseRun(exitCode, String(fetchStdout.text), String(fetchStderr.text))
+      var result = Prs.parseRun(exitCode, String(fetchStdout.text), String(fetchStderr.text),
+                                String(root.setting("aiCheckNames", "CodeRabbit")))
+      if (result.error === "") {
+        Prs.finishedAiReviews(root.lastPrs, result.prs).forEach(root.notifyAiReviewDone)
+        root.lastPrs = result.prs
+      }
       root.prs = result.prs
       root.error = result.error
       root.loaded = true
@@ -227,6 +243,8 @@ Panel {
 
       ScrollBar.vertical: ScrollBar {
         policy: ScrollBar.AsNeeded
+        // A custom handle loses the style's auto-hide, so hide it while the list fits.
+        visible: size < 1.0
         contentItem: Rectangle {
           implicitWidth: Style.space(3)
           radius: width / 2
@@ -310,6 +328,16 @@ Panel {
                     anchors.verticalCenter: parent.verticalCenter
                     status: row.modelData.status
                     size: Math.round(Style.font.caption * 0.5)
+                  }
+
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: row.modelData.aiReviewDone
+                    text: root.iconAiReview
+                    textFormat: Text.PlainText
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                    color: root.foreground
                   }
 
                   Text {

@@ -28,6 +28,7 @@ Set these on the widget's entry in `~/.config/omarchy/shell.json`:
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `refreshIntervalSec` | `10` | Seconds between GitHub queries. |
+| `aiCheckNames` | `"CodeRabbit"` | Comma-separated parts of check names that mark an AI code review. When every such check on a PR has finished, its row shows a robot icon and you get a notification. |
 
 ## Development
 

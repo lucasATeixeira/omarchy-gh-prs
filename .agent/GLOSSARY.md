@@ -2,6 +2,10 @@
 
 **Check**: one CI result on a PR's latest commit. In the GitHub API it is a `CheckRun` (GitHub Actions and apps) or a `StatusContext` (commit statuses). _Avoid_: job, build.
 
+**AI Check**: a Check made by an AI code reviewer, such as CodeRabbit. The user chooses which Checks are AI Checks by name. An AI Check still counts toward its PR's Status like any other Check. _Avoid_: AI review, bot review.
+
+**AI review done**: a PR whose latest commit has at least one AI Check, and every AI Check on it has finished, with any result. A new commit makes the PR not done again.
+
 **Status**: the CI state of a Check or a PR. One of `failing`, `running`, `passing`, or `none`. A PR's Status is the worst Status among its Checks; `none` means it has no Checks. _Avoid_: state, result, color.
 
 **Worst Status**: the first Status present in the order `failing` > `running` > `passing` > `none`.
