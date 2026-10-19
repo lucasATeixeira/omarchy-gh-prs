@@ -15,6 +15,8 @@
 
 /** @typedef {"failing"|"running"|"passing"|"none"} Status */
 
+/** @typedef {"APPROVED"|"CHANGES_REQUESTED"|"REVIEW_REQUIRED"} ReviewDecision */
+
 /**
  * An open pull request as the widget shows it.
  * @typedef {Object} PullRequest
@@ -26,6 +28,7 @@
  * @property {string} updatedAt ISO 8601 timestamp.
  * @property {Status} status
  * @property {boolean} aiReviewDone
+ * @property {?ReviewDecision} reviewDecision Null when the repo requires no review.
  */
 
 /**
@@ -152,9 +155,9 @@ function sections(prs) {
         .filter(function (section) { return section.prs.length > 0; });
 }
 
-/** GraphQL query for the user's 50 most recently updated open PRs and their latest commit's checks. */
+/** GraphQL query for the user's 50 most recently updated open PRs, their review decision, and their latest commit's checks. */
 var QUERY = "query { search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) {"
-    + " nodes { ... on PullRequest { number title url isDraft updatedAt repository { nameWithOwner }"
+    + " nodes { ... on PullRequest { number title url isDraft updatedAt reviewDecision repository { nameWithOwner }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
     + " __typename ... on CheckRun { name status conclusion } ... on StatusContext { context state } } } } } } } } } } }";
 
@@ -188,7 +191,8 @@ function toPullRequest(node, aiCheckPatterns) {
         isDraft: node.isDraft,
         updatedAt: node.updatedAt,
         status: prStatus(checks),
-        aiReviewDone: aiReviewDone(checks, aiCheckPatterns)
+        aiReviewDone: aiReviewDone(checks, aiCheckPatterns),
+        reviewDecision: node.reviewDecision
     };
 }
 
