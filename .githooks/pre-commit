@@ -1,0 +1,6 @@
+#!/bin/sh
+# Blocks the commit when a test fails or a QML file has a syntax error.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+node --test tests/*.test.js
+qmllint ./*.qml

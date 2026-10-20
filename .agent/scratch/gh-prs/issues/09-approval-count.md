@@ -18,8 +18,10 @@ Show how many **Approvals** a PR has, as `nf-md-check_circle` with a count. It r
 - [x] Row order: Status dot, robot, Approval icon, Review decision icon, Unresolved thread icon, Conflict icon.
 - [x] Approval notifications and their icon do not change.
 - [x] Tests cover: no reviews, several approvals, approvals mixed with other states, a `DISMISSED` review.
-- [ ] Checked by hand after `omarchy restart shell`.
+- [x] Checked by hand after `omarchy restart shell`.
 
 ## Comments
 
 Implemented on branch `approval-count-icon`. The hand check after `omarchy restart shell` is left to the user.
+
+Checked by hand by the user after `omarchy restart shell`.

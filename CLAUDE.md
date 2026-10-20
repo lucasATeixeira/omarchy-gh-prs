@@ -1,3 +1,7 @@
+## Running the plugin
+
+The plugin runs from this directory, so `omarchy restart shell` shows the current branch. Ask for the hand check before merging.
+
 ## Agent skills
 
 ### Issue tracker
