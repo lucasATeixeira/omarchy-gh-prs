@@ -56,7 +56,7 @@ const prNode = (overrides) => Object.assign({
 }, overrides)
 
 const response = (nodes, toReviewNodes = []) => JSON.stringify({
-  data: { viewer: { login: 'me' }, authored: { nodes }, toReview: { nodes: toReviewNodes } }
+  data: { viewer: { login: 'me' }, authoredPrs: { nodes }, prsToReview: { nodes: toReviewNodes } }
 })
 
 describe('parseRun success', () => {
@@ -381,6 +381,27 @@ describe('parseRun PRs to review', () => {
 
   it('is empty when nothing waits for the viewer', () => {
     assert.deepEqual(P.parseRun(0, response([prNode()], []), '', '').prsToReview, [])
+  })
+
+  it('drops both lists on a broken response', () => {
+    const result = P.parseRun(0, '<html>', '', '')
+    assert.deepEqual([result.prs, result.prsToReview], [[], []])
+  })
+})
+
+describe('tabs', () => {
+  const authored = [pr('passing')]
+  const toReview = [pr('failing'), pr('running')]
+
+  it('lists Authored, then To review with the author shown', () => {
+    assert.deepEqual(P.tabs(authored, toReview, true), [
+      { name: 'authored', label: 'Authored 1', prs: authored, emptyText: 'No open pull requests', showAuthor: false },
+      { name: 'toReview', label: 'To review 2', prs: toReview, emptyText: 'No PRs to review', showAuthor: true }
+    ])
+  })
+
+  it('hides the counts when the lists are not fresh', () => {
+    assert.deepEqual(P.tabs([], [], false).map((tab) => tab.label), ['Authored', 'To review'])
   })
 })
 

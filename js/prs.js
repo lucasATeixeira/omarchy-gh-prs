@@ -217,10 +217,37 @@ function sections(prs) {
         .filter(function (section) { return section.prs.length > 0; });
 }
 
+/** @typedef {"authored"|"toReview"} TabName */
+
+/**
+ * One Tab of the popup and the PRs it lists.
+ * @typedef {Object} Tab
+ * @property {TabName} name
+ * @property {string} label
+ * @property {PullRequest[]} prs
+ * @property {string} emptyText
+ * @property {boolean} showAuthor Whether rows show who opened the PR.
+ */
+
+/**
+ * The popup's Tabs in order.
+ * @param {PullRequest[]} authoredPrs
+ * @param {PullRequest[]} prsToReview
+ * @param {boolean} showCounts False before the first fetch ends and on error.
+ * @returns {Tab[]}
+ */
+function tabs(authoredPrs, prsToReview, showCounts) {
+    var count = function (prs) { return showCounts ? " " + prs.length : ""; };
+    return [
+        { name: "authored", label: "Authored" + count(authoredPrs), prs: authoredPrs, emptyText: "No open pull requests", showAuthor: false },
+        { name: "toReview", label: "To review" + count(prsToReview), prs: prsToReview, emptyText: "No PRs to review", showAuthor: true }
+    ];
+}
+
 /** GraphQL query for the 50 most recently updated Authored PRs and PRs to review, with the fields each row shows. */
 var QUERY = "query { viewer { login }"
-    + " authored: search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } }"
-    + " toReview: search(query: \"is:pr is:open review-requested:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } } }"
+    + " authoredPrs: search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } }"
+    + " prsToReview: search(query: \"is:pr is:open review-requested:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } } }"
     + " fragment PrFields on PullRequest { id number title url isDraft updatedAt author { login } reviewDecision mergeable repository { nameWithOwner }"
     + " reviewThreads(first: 100) { nodes { isResolved } }"
     + " latestReviews(first: 20) { nodes { id state author { login } } }"
@@ -244,8 +271,8 @@ function parseRun(exitCode, stdout, stderr, aiCheckNames) {
             return search.nodes.map(function (node) { return toPullRequest(node, patterns); });
         };
         return {
-            prs: toPullRequests(data.authored),
-            prsToReview: toPullRequests(data.toReview),
+            prs: toPullRequests(data.authoredPrs),
+            prsToReview: toPullRequests(data.prsToReview),
             viewerLogin: data.viewer.login,
             error: ""
         };
@@ -695,6 +722,7 @@ if (typeof module !== "undefined") {
         removeAiCheckPattern: removeAiCheckPattern,
         barSummary: barSummary,
         sections: sections,
+        tabs: tabs,
         errorMessage: errorMessage,
         DEFAULT_COLORS: DEFAULT_COLORS,
         themeColors: themeColors

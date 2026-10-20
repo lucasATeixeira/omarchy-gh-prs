@@ -46,7 +46,7 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 
 - Max height: 60% of the screen height; below that it fits its content.
 - Header: "Pull Requests" plus the Bar summary as `● 1`. It stays fixed; only the Sections scroll.
-- Two **Tabs** under the header: `Authored <n>` and `To review <n>`. A click selects a Tab. The popup remembers the selected Tab while the shell runs and starts on Authored. The Tabs are hidden while Settings is open.
+- Two **Tabs** under the header: `Authored <n>` and `To review <n>`. The counts are hidden before the first fetch ends and on error. A click selects a Tab. The popup remembers the selected Tab while the shell runs and starts on Authored. The Tabs are hidden while Settings is open.
 - Both Tabs show their PRs in the same Sections and rows. To review rows also show the author as `@login` in muted text after `owner/repo#123`.
 - A thin scrollbar on the right appears only when the list overflows.
 - Sections, in order: Failing, Running, Passing, No CI. Empty Sections are hidden. Each Section header shows its dot (~8px, larger than the row dot) and PR count. Inside a Section, the most recently updated PR comes first.

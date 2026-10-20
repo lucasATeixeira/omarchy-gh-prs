@@ -46,8 +46,7 @@ Panel {
   property bool loaded: false
   property var colors: Prs.DEFAULT_COLORS
   property bool settingsOpen: false
-  // The selected Tab: "authored" or "toReview".
-  property string tab: "authored"
+  property int tabIndex: 0
 
   readonly property string aiCheckNames: String(setting("aiCheckNames", "CodeRabbit"))
   readonly property int refreshIntervalSec: Prs.refreshIntervalSec(setting("refreshIntervalSec", 10))
@@ -56,10 +55,8 @@ Panel {
   // An error shows as a red mark instead of a count.
   readonly property string badgeStatus: error !== "" ? "failing" : summary.status
   readonly property string badgeLabel: error !== "" ? iconError : String(summary.count)
-  readonly property var tabOptions: [
-    { value: "authored", label: "Authored " + prs.length },
-    { value: "toReview", label: "To review " + prsToReview.length }
-  ]
+  readonly property var tabs: Prs.tabs(prs, prsToReview, loaded && error === "")
+  readonly property var currentTab: tabs[tabIndex]
 
   function colorFor(status) {
     return colors[status] || Commons.Color.muted
@@ -92,8 +89,9 @@ Panel {
     refresh()
   }
 
-  function selectTab(name) {
-    tab = name
+  // Selects the Tab at the index, kept within the Tabs.
+  function selectTab(index) {
+    tabIndex = Math.max(0, Math.min(tabs.length - 1, index))
     scroller.contentY = 0
   }
 
@@ -464,9 +462,9 @@ Panel {
       anchors.fill: parent
       onCloseRequested: root.settingsOpen ? root.closeSettings() : root.close()
       onTabRequested: function(direction) { if (!root.settingsOpen) root.switchPanel(direction) }
-      // h/l and Left/Right pick the Tab on that side.
+      // h/l and Left/Right select the next Tab on that side.
       onMoveRequested: function(dx, dy) {
-        if (!root.settingsOpen && dx !== 0) root.selectTab(dx > 0 ? "toReview" : "authored")
+        if (!root.settingsOpen && dx !== 0) root.selectTab(root.tabIndex + dx)
       }
 
       Column {
@@ -516,12 +514,12 @@ Panel {
 
         ButtonGroup {
           visible: !root.settingsOpen
-          options: root.tabOptions
-          value: root.tab
+          options: root.tabs.map(function(tab) { return { value: tab.name, label: tab.label } })
+          value: root.currentTab.name
           focusable: false
           foreground: root.foreground
           fontFamily: root.fontFamily
-          onChanged: function(value) { root.selectTab(value) }
+          onChanged: function(value) { root.selectTab(root.tabs.findIndex(function(tab) { return tab.name === value })) }
         }
 
         PanelSeparator { width: parent.width }
@@ -561,9 +559,9 @@ Panel {
           id: prList
           visible: !root.settingsOpen
           width: scroller.pageWidth
-          prs: root.tab === "authored" ? root.prs : root.prsToReview
-          emptyText: root.tab === "authored" ? "No open pull requests" : "No PRs to review"
-          showAuthor: root.tab === "toReview"
+          prs: root.currentTab.prs
+          emptyText: root.currentTab.emptyText
+          showAuthor: root.currentTab.showAuthor
         }
       }
     }
