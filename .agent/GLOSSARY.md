@@ -27,3 +27,11 @@
 **Conflict**: a PR that GitHub says cannot merge because its branch conflicts with the base branch. _Avoid_: merge error.
 
 **Unresolved thread**: a review comment thread on a PR's code that nobody has marked as resolved. _Avoid_: open comment, pending comment.
+
+**Review**: one reviewer's verdict on a PR: approved, changes requested, or only comments. Each reviewer's latest Review counts. Unlike the Review decision, a PR has Reviews even when its repo requires none. _Avoid_: approval, review status.
+
+**Code comment**: a comment on a line of a PR's code. It is the first comment of a review thread or a reply in one. _Avoid_: review comment, inline comment.
+
+**Merged**: a PR whose branch GitHub merged into the base branch. _Avoid_: done, shipped.
+
+**Closed**: a PR that someone closed without merging it. A Merged PR is not Closed. _Avoid_: rejected, abandoned.
