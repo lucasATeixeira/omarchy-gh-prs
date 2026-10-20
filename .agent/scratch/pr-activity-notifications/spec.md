@@ -1,6 +1,6 @@
 # Spec: PR activity notifications
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
