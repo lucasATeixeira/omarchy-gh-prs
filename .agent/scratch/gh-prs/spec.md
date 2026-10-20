@@ -54,6 +54,7 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 - Before the first fetch ends: no list and no empty message.
 - Zero PRs: "No open pull requests" on Authored, "No PRs to review" on To review.
 - Escape closes the popup, and Tab switches to the next bar panel, like the shell's own panels.
+- `h` or Left selects Authored, and `l` or Right selects To review. These keys do nothing while Settings is open.
 - On error: only the error message, on both Tabs. When the cause is auth, the message is "Not logged in to GitHub. Run: gh auth login". The error clears on the next successful poll.
 
 ## AI review

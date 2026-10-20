@@ -464,6 +464,10 @@ Panel {
       anchors.fill: parent
       onCloseRequested: root.settingsOpen ? root.closeSettings() : root.close()
       onTabRequested: function(direction) { if (!root.settingsOpen) root.switchPanel(direction) }
+      // h/l and Left/Right pick the Tab on that side.
+      onMoveRequested: function(dx, dy) {
+        if (!root.settingsOpen && dx !== 0) root.selectTab(dx > 0 ? "toReview" : "authored")
+      }
 
       Column {
         id: header
