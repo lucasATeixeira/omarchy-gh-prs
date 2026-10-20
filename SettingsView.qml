@@ -159,6 +159,8 @@ FocusScope {
         SettingToggle { key: "notifyAiReviewDone"; label: "AI review done" }
         SettingToggle { key: "notifyCiPassed"; label: "CI passed" }
         SettingToggle { key: "notifyCiFailed"; label: "CI failed" }
+        SettingToggle { key: "notifyApproved"; label: "PR approved" }
+        SettingToggle { key: "notifyChangesRequested"; label: "Changes requested" }
       }
     }
   }

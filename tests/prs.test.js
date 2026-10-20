@@ -47,6 +47,7 @@ const prNode = (overrides) => Object.assign({
   updatedAt: '2026-10-19T10:00:00Z',
   reviewDecision: 'APPROVED',
   reviewThreads: { nodes: [] },
+  latestReviews: { nodes: [] },
   mergeable: 'MERGEABLE',
   repository: { nameWithOwner: 'acme/app' },
   commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [run('COMPLETED', 'FAILURE')] } } } }] }
@@ -68,7 +69,8 @@ describe('parseRun success', () => {
         aiReviewDone: false,
         reviewDecision: 'APPROVED',
         unresolvedThreadCount: 0,
-        hasConflict: false
+        hasConflict: false,
+        latestReviews: []
       }],
       error: ''
     })
@@ -251,6 +253,19 @@ describe('parseRun review decision', () => {
   })
 })
 
+const latestReviewsFor = (reviews) => P.parseRun(0, response([prNode({ latestReviews: { nodes: reviews } })]), '', '').prs[0].latestReviews
+
+describe('parseRun latest reviews', () => {
+  it('reads each review id, state and author login', () => {
+    const reviews = [{ id: 'R1', state: 'APPROVED', author: { login: 'ana' } }, { id: 'R2', state: 'COMMENTED', author: { login: 'bob' } }]
+    assert.deepEqual(latestReviewsFor(reviews), [{ id: 'R1', state: 'APPROVED', author: 'ana' }, { id: 'R2', state: 'COMMENTED', author: 'bob' }])
+  })
+
+  it('names a deleted author ghost', () => {
+    assert.equal(latestReviewsFor([{ id: 'R1', state: 'APPROVED', author: null }])[0].author, 'ghost')
+  })
+})
+
 const thread = (isResolved) => ({ isResolved })
 const unresolvedThreadCountFor = (threads) => P.parseRun(0, response([prNode({ reviewThreads: { nodes: threads } })]), '', '').prs[0].unresolvedThreadCount
 
@@ -291,6 +306,10 @@ describe('QUERY', () => {
 
   it('reads whether each review thread is resolved', () => {
     assert.match(P.QUERY, /reviewThreads\(first: 100\)[^}]*\bisResolved\b/)
+  })
+
+  it('reads each reviewer\'s latest review', () => {
+    assert.match(P.QUERY, /latestReviews\(first: 20\) \{ nodes \{ id state author \{ login \} \} \}/)
   })
 
   it('reads whether the PR can merge', () => {
@@ -417,12 +436,20 @@ describe('notificationEnabled', () => {
     }
   })
 
+  it('treats the review toggles like the others', () => {
+    for (const key of ['notifyApproved', 'notifyChangesRequested']) {
+      assert.equal(P.notificationEnabled({}, key), true, key)
+      assert.equal(P.notificationEnabled({ [key]: false }, key), false, key)
+      assert.equal(P.notificationEnabled({ notificationsEnabled: false }, key), false, key)
+    }
+  })
+
   it('ignores the other toggles', () => {
     assert.equal(P.notificationEnabled({ notifyCiPassed: false, notifyAiReviewDone: false }, 'notifyCiFailed'), true)
   })
 })
 
-const polled = (number, status, aiReviewDone) => Object.assign(pr(status, undefined, number), { url: 'u' + number, aiReviewDone })
+const polled = (number, status, aiReviewDone) => Object.assign(pr(status, undefined, number), { url: 'u' + number, aiReviewDone, latestReviews: [] })
 const sent = (notifications) => notifications.map(n => [n.setting, n.title, n.pr.number])
 
 describe('pollNotifications', () => {
@@ -451,5 +478,47 @@ describe('pollNotifications', () => {
 
   it('sends nothing for a PR seen for the first time', () => {
     assert.deepEqual(P.pollNotifications([polled(1, 'running', false)], [polled(2, 'passing', true)], null, 'me'), [])
+  })
+})
+
+const review = (id, state, author = 'ana') => ({ id, state, author })
+const withReviews = (reviews) => Object.assign(polled(1, 'none', false), { latestReviews: reviews })
+const reviewNotifications = (before, now) => sent(P.pollNotifications([withReviews(before)], [withReviews(now)], null, 'me'))
+
+describe('pollNotifications reviews', () => {
+  it('notifies when a reviewer approves', () => {
+    assert.deepEqual(reviewNotifications([], [review('R1', 'APPROVED')]), [['notifyApproved', 'Approved by ana', 1]])
+  })
+
+  it('notifies when a reviewer requests changes', () => {
+    assert.deepEqual(reviewNotifications([], [review('R1', 'CHANGES_REQUESTED')]), [['notifyChangesRequested', 'Changes requested by ana', 1]])
+  })
+
+  it('skips reviews that only comment or were dismissed', () => {
+    assert.deepEqual(reviewNotifications([], [review('R1', 'COMMENTED'), review('R2', 'DISMISSED', 'bob')]), [])
+  })
+
+  it('skips a review already seen in the last poll', () => {
+    assert.deepEqual(reviewNotifications([review('R1', 'APPROVED')], [review('R1', 'APPROVED')]), [])
+  })
+
+  it('notifies again when the same reviewer approves again', () => {
+    assert.deepEqual(reviewNotifications([review('R1', 'APPROVED')], [review('R2', 'APPROVED')]), [['notifyApproved', 'Approved by ana', 1]])
+  })
+
+  it('sends one notification per reviewer', () => {
+    assert.deepEqual(reviewNotifications([], [review('R1', 'APPROVED'), review('R2', 'CHANGES_REQUESTED', 'bob')]), [
+      ['notifyApproved', 'Approved by ana', 1],
+      ['notifyChangesRequested', 'Changes requested by bob', 1]
+    ])
+  })
+
+  it('sends nothing on the first poll', () => {
+    assert.deepEqual(P.pollNotifications(null, [withReviews([review('R1', 'APPROVED')])], null, 'me'), [])
+  })
+
+  it('sends nothing for a PR seen for the first time', () => {
+    const other = Object.assign(withReviews([]), { url: 'u2' })
+    assert.deepEqual(P.pollNotifications([other], [withReviews([review('R1', 'APPROVED')])], null, 'me'), [])
   })
 })

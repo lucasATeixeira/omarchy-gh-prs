@@ -24,7 +24,9 @@
       "notificationsEnabled": true,
       "notifyAiReviewDone": true,
       "notifyCiPassed": true,
-      "notifyCiFailed": true
+      "notifyCiFailed": true,
+      "notifyApproved": true,
+      "notifyChangesRequested": true
     },
     "schema": [
       { "key": "refreshIntervalSec", "type": "integer", "label": "Refresh interval (seconds)", "min": 5, "max": 3600, "step": 5 },
@@ -32,7 +34,9 @@
       { "key": "notificationsEnabled", "type": "boolean", "label": "All notifications" },
       { "key": "notifyAiReviewDone", "type": "boolean", "label": "Notify when the AI review is done" },
       { "key": "notifyCiPassed", "type": "boolean", "label": "Notify when CI passed" },
-      { "key": "notifyCiFailed", "type": "boolean", "label": "Notify when CI failed" }
+      { "key": "notifyCiFailed", "type": "boolean", "label": "Notify when CI failed" },
+      { "key": "notifyApproved", "type": "boolean", "label": "Notify when a PR is approved" },
+      { "key": "notifyChangesRequested", "type": "boolean", "label": "Notify when changes are requested" }
     ]
   }
 }

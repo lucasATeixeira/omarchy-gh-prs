@@ -25,7 +25,7 @@ Panel {
   readonly property string iconBack: "󰁍" // nf-md-arrow_left
   readonly property var reviewDecisionIcons: ({ APPROVED: iconApproved, CHANGES_REQUESTED: iconChangesRequested })
   // A notification setting missing here uses the GitHub icon.
-  readonly property var notificationIcons: ({ notifyAiReviewDone: iconAiReview })
+  readonly property var notificationIcons: ({ notifyAiReviewDone: iconAiReview, notifyApproved: iconApproved, notifyChangesRequested: iconChangesRequested })
 
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground

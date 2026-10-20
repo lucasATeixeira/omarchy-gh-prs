@@ -17,6 +17,16 @@
 
 /** @typedef {"APPROVED"|"CHANGES_REQUESTED"|"REVIEW_REQUIRED"} ReviewDecision */
 
+/** @typedef {"APPROVED"|"CHANGES_REQUESTED"|"COMMENTED"|"DISMISSED"|"PENDING"} ReviewState */
+
+/**
+ * A reviewer's latest Review on a PR.
+ * @typedef {Object} Review
+ * @property {string} id
+ * @property {ReviewState} state
+ * @property {string} author Login of the reviewer.
+ */
+
 /**
  * An open pull request as the widget shows it.
  * @typedef {Object} PullRequest
@@ -31,6 +41,7 @@
  * @property {?ReviewDecision} reviewDecision Null when the repo requires no review.
  * @property {number} unresolvedThreadCount
  * @property {boolean} hasConflict
+ * @property {Review[]} latestReviews One per reviewer.
  */
 
 /**
@@ -205,6 +216,7 @@ function sections(prs) {
 var QUERY = "query { search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) {"
     + " nodes { ... on PullRequest { number title url isDraft updatedAt reviewDecision mergeable repository { nameWithOwner }"
     + " reviewThreads(first: 100) { nodes { isResolved } }"
+    + " latestReviews(first: 20) { nodes { id state author { login } } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
     + " __typename ... on CheckRun { name status conclusion } ... on StatusContext { context state } } } } } } } } } } }";
 
@@ -241,8 +253,14 @@ function toPullRequest(node, aiCheckPatterns) {
         aiReviewDone: aiReviewDone(checks, aiCheckPatterns),
         reviewDecision: node.reviewDecision,
         unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length,
-        hasConflict: node.mergeable === "CONFLICTING"
+        hasConflict: node.mergeable === "CONFLICTING",
+        latestReviews: node.latestReviews.nodes.map(toReview)
     };
+}
+
+function toReview(node) {
+    // GitHub returns no author for a deleted account and shows it as "ghost".
+    return { id: node.id, state: node.state, author: node.author ? node.author.login : "ghost" };
 }
 
 /**
@@ -309,20 +327,64 @@ function pollNotifications(previousPrs, currentPrs, details, viewerLogin) {
     var ci = finishedCi(previousPrs, currentPrs).map(function (pr) {
         return { setting: ciNotificationSetting(pr.status), title: ciNotificationTitle(pr.status), pr: pr };
     });
-    return aiReviews.concat(ci);
+    return aiReviews.concat(ci, reviewNotifications(previousPrs, currentPrs));
 }
 
 /**
- * Current PRs that `changed` accepts against the same PR, matched by URL, in the previous poll.
+ * How a Review state is announced.
+ * @typedef {Object} ReviewNotification
+ * @property {NotificationSetting} setting
+ * @property {string} titlePrefix Followed by the reviewer's login.
+ */
+
+/** Review states that notify; other states send nothing. */
+var REVIEW_NOTIFICATIONS = {
+    APPROVED: { setting: "notifyApproved", titlePrefix: "Approved by " },
+    CHANGES_REQUESTED: { setting: "notifyChangesRequested", titlePrefix: "Changes requested by " }
+};
+
+/**
+ * One notification per approving or changes-requesting Review whose id the same PR did not have in the previous poll.
+ * @param {?PullRequest[]} previousPrs
+ * @param {PullRequest[]} currentPrs
+ * @returns {Notification[]}
+ */
+function reviewNotifications(previousPrs, currentPrs) {
+    var notifications = [];
+    currentPrs.forEach(function (now) {
+        var before = previousPr(previousPrs, now);
+        if (before === undefined) return;
+        var seenIds = before.latestReviews.map(function (review) { return review.id; });
+        now.latestReviews.forEach(function (review) {
+            var kind = REVIEW_NOTIFICATIONS[review.state];
+            if (kind && seenIds.indexOf(review.id) === -1) {
+                notifications.push({ setting: kind.setting, title: kind.titlePrefix + review.author, pr: now });
+            }
+        });
+    });
+    return notifications;
+}
+
+/**
+ * The same PR, matched by URL, in the previous poll.
+ * @param {?PullRequest[]} previousPrs
+ * @param {PullRequest} now
+ * @returns {PullRequest|undefined}
+ */
+function previousPr(previousPrs, now) {
+    return (previousPrs || []).find(function (pr) { return pr.url === now.url; });
+}
+
+/**
+ * Current PRs that `changed` accepts against the same PR in the previous poll.
  * @param {?PullRequest[]} previousPrs
  * @param {PullRequest[]} currentPrs
  * @param {function(PullRequest, PullRequest): boolean} changed Gets the previous and the current PR.
  * @returns {PullRequest[]}
  */
 function changedSincePoll(previousPrs, currentPrs, changed) {
-    var previous = previousPrs || [];
     return currentPrs.filter(function (now) {
-        var before = previous.find(function (pr) { return pr.url === now.url; });
+        var before = previousPr(previousPrs, now);
         return before !== undefined && changed(before, now);
     });
 }
@@ -378,9 +440,11 @@ function themeColors(toml) {
  * @property {boolean} [notifyAiReviewDone]
  * @property {boolean} [notifyCiPassed]
  * @property {boolean} [notifyCiFailed]
+ * @property {boolean} [notifyApproved]
+ * @property {boolean} [notifyChangesRequested]
  */
 
-/** @typedef {"notifyAiReviewDone"|"notifyCiPassed"|"notifyCiFailed"} NotificationSetting */
+/** @typedef {"notifyAiReviewDone"|"notifyCiPassed"|"notifyCiFailed"|"notifyApproved"|"notifyChangesRequested"} NotificationSetting */
 
 var REFRESH_INTERVAL_MIN_SEC = 5;
 var REFRESH_INTERVAL_MAX_SEC = 3600;
