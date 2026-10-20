@@ -23,9 +23,11 @@ Panel {
   readonly property string iconConflict: "󰀦" // nf-md-alert
   readonly property string iconSettings: "󰒓" // nf-md-cog
   readonly property string iconBack: "󰁍" // nf-md-arrow_left
+  readonly property string iconMerged: "󰘭" // nf-md-source_merge
+  readonly property string iconClosed: "󰅙" // nf-md-close_circle
   readonly property var reviewDecisionIcons: ({ APPROVED: iconApproved, CHANGES_REQUESTED: iconChangesRequested })
   // A notification setting missing here uses the GitHub icon.
-  readonly property var notificationIcons: ({ notifyAiReviewDone: iconAiReview })
+  readonly property var notificationIcons: ({ notifyAiReviewDone: iconAiReview, notifyMerged: iconMerged, notifyClosed: iconClosed })
 
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
@@ -33,6 +35,8 @@ Panel {
   property var prs: []
   // PRs from the last successful poll; null until the first one.
   property var lastPrs: null
+  // The successful main poll that waits for its details query.
+  property var pendingPoll: null
   property string error: ""
   property bool loaded: false
   property var colors: Prs.DEFAULT_COLORS
@@ -57,7 +61,7 @@ Panel {
   }
 
   function refresh() {
-    if (fetchProc.running) return
+    if (fetchProc.running || detailsProc.running) return
     themeFile.reload()
     fetchProc.running = true
   }
@@ -100,6 +104,12 @@ Panel {
     ])
   }
 
+  // Sends the notifications of a successful poll and remembers its PRs; null details skip the rules that need them.
+  function finishPoll(poll, details) {
+    Prs.pollNotifications(root.lastPrs, poll.prs, details, poll.viewerLogin).forEach(root.notify)
+    root.lastPrs = poll.prs
+  }
+
   onOpenedChanged: opened ? refresh() : closeSettings()
 
   FileView {
@@ -118,12 +128,29 @@ Panel {
       var result = Prs.parseRun(exitCode, String(fetchStdout.text), String(fetchStderr.text),
                                 root.aiCheckNames)
       if (result.error === "") {
-        Prs.pollNotifications(root.lastPrs, result.prs, null, "").forEach(root.notify)
-        root.lastPrs = result.prs
+        var ids = Prs.prIdsNeedingDetails(root.lastPrs, result.prs)
+        if (ids.length > 0) {
+          root.pendingPoll = result
+          detailsProc.command = Prs.detailsCommand(ids)
+          detailsProc.running = true
+        } else {
+          root.finishPoll(result, null)
+        }
       }
       root.prs = result.prs
       root.error = result.error
       root.loaded = true
+    }
+  }
+
+  Process {
+    id: detailsProc
+    stdout: StdioCollector { id: detailsStdout; waitForEnd: true }
+    stderr: StdioCollector { id: detailsStderr; waitForEnd: true }
+    onExited: function(exitCode) {
+      var result = Prs.parseDetailsRun(exitCode, String(detailsStdout.text), String(detailsStderr.text))
+      root.finishPoll(root.pendingPoll, result.error === "" ? result.details : null)
+      root.pendingPoll = null
     }
   }
 

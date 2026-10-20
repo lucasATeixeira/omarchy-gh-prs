@@ -40,6 +40,7 @@ describe('prStatus', () => {
 })
 
 const prNode = (overrides) => Object.assign({
+  id: 'PR_7',
   number: 7,
   title: 'Add widget',
   url: 'https://github.com/acme/app/pull/7',
@@ -52,12 +53,13 @@ const prNode = (overrides) => Object.assign({
   commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [run('COMPLETED', 'FAILURE')] } } } }] }
 }, overrides)
 
-const response = (nodes) => JSON.stringify({ data: { search: { nodes } } })
+const response = (nodes) => JSON.stringify({ data: { viewer: { login: 'me' }, search: { nodes } } })
 
 describe('parseRun success', () => {
   it('turns search results into pull requests with their CI status', () => {
     assert.deepEqual(P.parseRun(0, response([prNode()]), '', ''), {
       prs: [{
+        id: 'PR_7',
         repo: 'acme/app',
         number: 7,
         title: 'Add widget',
@@ -70,6 +72,7 @@ describe('parseRun success', () => {
         unresolvedThreadCount: 0,
         hasConflict: false
       }],
+      viewerLogin: 'me',
       error: ''
     })
   })
@@ -296,6 +299,11 @@ describe('QUERY', () => {
   it('reads whether the PR can merge', () => {
     assert.match(P.QUERY, /\bmergeable\b/)
   })
+
+  it('reads the PR id and the viewer login', () => {
+    assert.match(P.QUERY, /PullRequest \{ id\b/)
+    assert.match(P.QUERY, /viewer \{ login \}/)
+  })
 })
 
 describe('parseRun exit codes', () => {
@@ -451,5 +459,99 @@ describe('pollNotifications', () => {
 
   it('sends nothing for a PR seen for the first time', () => {
     assert.deepEqual(P.pollNotifications([polled(1, 'running', false)], [polled(2, 'passing', true)], null, 'me'), [])
+  })
+})
+
+const withId = (number) => Object.assign(polled(number, 'none', false), { id: 'PR_' + number })
+
+describe('prIdsNeedingDetails', () => {
+  it('lists PRs missing from the current poll', () => {
+    assert.deepEqual(P.prIdsNeedingDetails([withId(1), withId(2)], [withId(2)]), ['PR_1'])
+  })
+
+  it('skips unchanged and new PRs', () => {
+    assert.deepEqual(P.prIdsNeedingDetails([withId(1)], [withId(1), withId(2)]), [])
+  })
+
+  it('is empty on the first poll', () => {
+    assert.deepEqual(P.prIdsNeedingDetails(null, [withId(1)]), [])
+  })
+})
+
+describe('detailsCommand', () => {
+  it('passes each PR id as an item of the ids variable', () => {
+    assert.deepEqual(P.detailsCommand(['PR_1', 'PR_2']),
+      ['gh', 'api', 'graphql', '-f', 'query=' + P.DETAILS_QUERY, '-f', 'ids[]=PR_1', '-f', 'ids[]=PR_2'])
+  })
+})
+
+const detailsNode = (state, mergedBy, closedBy) => ({
+  id: 'PR_1',
+  state,
+  mergedBy: mergedBy ? { login: mergedBy } : null,
+  timelineItems: { nodes: closedBy ? [{ actor: { login: closedBy } }] : [] }
+})
+const detailsResponse = (nodes) => JSON.stringify({ data: { nodes } })
+
+describe('parseDetailsRun', () => {
+  it('reads who merged a merged PR', () => {
+    assert.deepEqual(P.parseDetailsRun(0, detailsResponse([detailsNode('MERGED', 'alice', 'alice')]), ''),
+      { details: [{ id: 'PR_1', state: 'MERGED', actor: 'alice' }], error: '' })
+  })
+
+  it('reads who closed a closed PR', () => {
+    assert.equal(P.parseDetailsRun(0, detailsResponse([detailsNode('CLOSED', null, 'bob')]), '').details[0].actor, 'bob')
+  })
+
+  it('has no actor for an open PR that was never closed', () => {
+    assert.equal(P.parseDetailsRun(0, detailsResponse([detailsNode('OPEN', null, null)]), '').details[0].actor, '')
+  })
+
+  it('reports a gh failure', () => {
+    assert.deepEqual(P.parseDetailsRun(1, '', 'gh: Could not resolve to a node\n'),
+      { details: [], error: 'gh: Could not resolve to a node' })
+  })
+
+  it('reports a broken response', () => {
+    assert.equal(P.parseDetailsRun(0, '{"data":{}}', '').error, 'Unexpected response from gh')
+  })
+})
+
+const details = (state, actor) => [{ id: 'PR_1', state, actor }]
+
+describe('pollNotifications merged and closed', () => {
+  it('notifies when someone else merged the PR, with the PR from the previous poll', () => {
+    const notifications = P.pollNotifications([withId(1)], [], details('MERGED', 'alice'), 'me')
+    assert.deepEqual(sent(notifications), [['notifyMerged', 'PR merged by alice', 1]])
+    assert.equal(notifications[0].pr.url, 'u1')
+  })
+
+  it('notifies when someone else closed the PR', () => {
+    assert.deepEqual(sent(P.pollNotifications([withId(1)], [], details('CLOSED', 'bob'), 'me')),
+      [['notifyClosed', 'PR closed by bob', 1]])
+  })
+
+  it('sends nothing when the viewer merged or closed the PR', () => {
+    assert.deepEqual(P.pollNotifications([withId(1)], [], details('MERGED', 'me'), 'me'), [])
+    assert.deepEqual(P.pollNotifications([withId(1)], [], details('CLOSED', 'me'), 'me'), [])
+  })
+
+  it('sends nothing for a missing PR that is still open', () => {
+    assert.deepEqual(P.pollNotifications([withId(1)], [], details('OPEN', ''), 'me'), [])
+  })
+
+  it('skips merged and closed but keeps the other notifications when details failed', () => {
+    const previous = [withId(1), Object.assign(withId(2), { status: 'running' })]
+    const current = [Object.assign(withId(2), { status: 'passing' })]
+    assert.deepEqual(sent(P.pollNotifications(previous, current, null, 'me')), [['notifyCiPassed', 'CI passed', 2]])
+  })
+})
+
+describe('notificationEnabled merged and closed', () => {
+  it('is on when the key is missing and off when it is false', () => {
+    for (const key of ['notifyMerged', 'notifyClosed']) {
+      assert.equal(P.notificationEnabled({}, key), true, key)
+      assert.equal(P.notificationEnabled({ [key]: false }, key), false, key)
+    }
   })
 })

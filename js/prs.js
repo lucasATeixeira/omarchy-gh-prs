@@ -20,6 +20,7 @@
 /**
  * An open pull request as the widget shows it.
  * @typedef {Object} PullRequest
+ * @property {string} id GitHub node id.
  * @property {string} repo "owner/name".
  * @property {number} number
  * @property {string} title
@@ -37,6 +38,7 @@
  * The outcome of one fetch; `error` is empty on success.
  * @typedef {Object} FetchResult
  * @property {PullRequest[]} prs
+ * @property {string} [viewerLogin] The logged-in user; set on success.
  * @property {string} error
  */
 
@@ -202,8 +204,8 @@ function sections(prs) {
 }
 
 /** GraphQL query for the user's 50 most recently updated open PRs and the fields each row shows. */
-var QUERY = "query { search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) {"
-    + " nodes { ... on PullRequest { number title url isDraft updatedAt reviewDecision mergeable repository { nameWithOwner }"
+var QUERY = "query { viewer { login } search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) {"
+    + " nodes { ... on PullRequest { id number title url isDraft updatedAt reviewDecision mergeable repository { nameWithOwner }"
     + " reviewThreads(first: 100) { nodes { isResolved } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
     + " __typename ... on CheckRun { name status conclusion } ... on StatusContext { context state } } } } } } } } } } }";
@@ -220,8 +222,12 @@ function parseRun(exitCode, stdout, stderr, aiCheckNames) {
     if (exitCode !== 0) return { prs: [], error: errorMessage(stderr, exitCode) };
     try {
         var patterns = aiCheckPatterns(aiCheckNames);
-        var nodes = JSON.parse(stdout).data.search.nodes;
-        return { prs: nodes.map(function (node) { return toPullRequest(node, patterns); }), error: "" };
+        var data = JSON.parse(stdout).data;
+        return {
+            prs: data.search.nodes.map(function (node) { return toPullRequest(node, patterns); }),
+            viewerLogin: data.viewer.login,
+            error: ""
+        };
     } catch (e) {
         return { prs: [], error: "Unexpected response from gh" };
     }
@@ -231,6 +237,7 @@ function toPullRequest(node, aiCheckPatterns) {
     var rollup = node.commits.nodes[0].commit.statusCheckRollup;
     var checks = rollup ? rollup.contexts.nodes : [];
     return {
+        id: node.id,
         repo: node.repository.nameWithOwner,
         number: node.number,
         title: node.title,
@@ -288,11 +295,59 @@ function ciNotificationTitle(status) {
  * @property {PullRequest} pr
  */
 
+/** @typedef {"OPEN"|"MERGED"|"CLOSED"} PrState */
+
 /**
  * What the details query read about one PR.
  * @typedef {Object} PrDetails
  * @property {string} id The PR's node id.
+ * @property {PrState} state
+ * @property {string} actor Login of who merged or closed the PR; empty when it was never closed.
  */
+
+/**
+ * The outcome of one details run; `error` is empty on success.
+ * @typedef {Object} DetailsResult
+ * @property {PrDetails[]} details
+ * @property {string} error
+ */
+
+/** GraphQL query for the state of the PRs in `$ids` and who merged or closed each one. */
+var DETAILS_QUERY = "query($ids: [ID!]!) { nodes(ids: $ids) { ... on PullRequest { id state mergedBy { login }"
+    + " timelineItems(itemTypes: [CLOSED_EVENT], last: 1) { nodes { ... on ClosedEvent { actor { login } } } } } } }";
+
+/**
+ * The `gh` command that runs DETAILS_QUERY for these PR ids.
+ * @param {string[]} ids
+ * @returns {string[]}
+ */
+function detailsCommand(ids) {
+    var command = ["gh", "api", "graphql", "-f", "query=" + DETAILS_QUERY];
+    ids.forEach(function (id) { command.push("-f", "ids[]=" + id); });
+    return command;
+}
+
+/**
+ * Turns one `gh api graphql` run with DETAILS_QUERY into PR details, or an error.
+ * @param {number} exitCode
+ * @param {string} stdout
+ * @param {string} stderr
+ * @returns {DetailsResult}
+ */
+function parseDetailsRun(exitCode, stdout, stderr) {
+    if (exitCode !== 0) return { details: [], error: errorMessage(stderr, exitCode) };
+    try {
+        return { details: JSON.parse(stdout).data.nodes.map(toPrDetails), error: "" };
+    } catch (e) {
+        return { details: [], error: "Unexpected response from gh" };
+    }
+}
+
+function toPrDetails(node) {
+    var closedEvent = node.timelineItems.nodes[0];
+    var actor = node.state === "MERGED" ? node.mergedBy.login : closedEvent ? closedEvent.actor.login : "";
+    return { id: node.id, state: node.state, actor: actor };
+}
 
 /**
  * The notifications one successful poll sends, compared with the previous successful poll.
@@ -309,7 +364,31 @@ function pollNotifications(previousPrs, currentPrs, details, viewerLogin) {
     var ci = finishedCi(previousPrs, currentPrs).map(function (pr) {
         return { setting: ciNotificationSetting(pr.status), title: ciNotificationTitle(pr.status), pr: pr };
     });
-    return aiReviews.concat(ci);
+    return aiReviews.concat(ci, mergedOrClosed(previousPrs, currentPrs, details || [], viewerLogin));
+}
+
+var MERGED_OR_CLOSED = {
+    MERGED: { setting: "notifyMerged", verb: "merged" },
+    CLOSED: { setting: "notifyClosed", verb: "closed" }
+};
+
+/**
+ * Notifications for PRs missing since the previous poll that someone other than the viewer merged or closed.
+ * @param {?PullRequest[]} previousPrs
+ * @param {PullRequest[]} currentPrs
+ * @param {PrDetails[]} details
+ * @param {string} viewerLogin
+ * @returns {Notification[]}
+ */
+function mergedOrClosed(previousPrs, currentPrs, details, viewerLogin) {
+    var notifications = [];
+    missingSincePoll(previousPrs, currentPrs).forEach(function (pr) {
+        var prDetails = details.find(function (d) { return d.id === pr.id; });
+        var event = prDetails && MERGED_OR_CLOSED[prDetails.state];
+        if (!event || prDetails.actor === viewerLogin) return;
+        notifications.push({ setting: event.setting, title: "PR " + event.verb + " by " + prDetails.actor, pr: pr });
+    });
+    return notifications;
 }
 
 /**
@@ -325,6 +404,28 @@ function changedSincePoll(previousPrs, currentPrs, changed) {
         var before = previous.find(function (pr) { return pr.url === now.url; });
         return before !== undefined && changed(before, now);
     });
+}
+
+/**
+ * PRs of the previous poll that are not in the current one, matched by URL.
+ * @param {?PullRequest[]} previousPrs
+ * @param {PullRequest[]} currentPrs
+ * @returns {PullRequest[]}
+ */
+function missingSincePoll(previousPrs, currentPrs) {
+    return (previousPrs || []).filter(function (before) {
+        return !currentPrs.some(function (now) { return now.url === before.url; });
+    });
+}
+
+/**
+ * Ids of the PRs the details query must read: those missing since the previous poll.
+ * @param {?PullRequest[]} previousPrs Null before the first successful poll.
+ * @param {PullRequest[]} currentPrs
+ * @returns {string[]}
+ */
+function prIdsNeedingDetails(previousPrs, currentPrs) {
+    return missingSincePoll(previousPrs, currentPrs).map(function (pr) { return pr.id; });
 }
 
 /**
@@ -378,9 +479,11 @@ function themeColors(toml) {
  * @property {boolean} [notifyAiReviewDone]
  * @property {boolean} [notifyCiPassed]
  * @property {boolean} [notifyCiFailed]
+ * @property {boolean} [notifyMerged]
+ * @property {boolean} [notifyClosed]
  */
 
-/** @typedef {"notifyAiReviewDone"|"notifyCiPassed"|"notifyCiFailed"} NotificationSetting */
+/** @typedef {"notifyAiReviewDone"|"notifyCiPassed"|"notifyCiFailed"|"notifyMerged"|"notifyClosed"} NotificationSetting */
 
 var REFRESH_INTERVAL_MIN_SEC = 5;
 var REFRESH_INTERVAL_MAX_SEC = 3600;
@@ -436,6 +539,10 @@ if (typeof module !== "undefined") {
         ciNotificationTitle: ciNotificationTitle,
         ciNotificationSetting: ciNotificationSetting,
         pollNotifications: pollNotifications,
+        prIdsNeedingDetails: prIdsNeedingDetails,
+        DETAILS_QUERY: DETAILS_QUERY,
+        detailsCommand: detailsCommand,
+        parseDetailsRun: parseDetailsRun,
         notificationEnabled: notificationEnabled,
         settingOn: settingOn,
         REFRESH_INTERVAL_MIN_SEC: REFRESH_INTERVAL_MIN_SEC,

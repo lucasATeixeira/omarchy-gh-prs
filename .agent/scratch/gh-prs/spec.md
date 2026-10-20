@@ -12,6 +12,9 @@ An Omarchy shell bar widget that shows the CI status of the user's open GitHub p
 - The `gh` CLI runs one GraphQL query: open PRs the user authored, across all repos, drafts included, at most 50.
 - CI comes from the latest commit's `statusCheckRollup`. All **Checks** count, not only required ones.
 - The same query also reads each PR's `reviewDecision`, `mergeable`, and review threads' `isResolved`.
+- The same query also reads each PR's node `id` and the viewer's login. It costs 2 points, measured with `rateLimit(dryRun: true)`.
+- **Details query**: when PRs of the last successful poll are missing from the current one, a second query, `nodes(ids: ...)`, reads their `state`, `mergedBy`, and the actor of their latest `ClosedEvent`. It costs about 1 point per PR. It does not run on the first poll or when no PR is missing.
+- A new poll does not start while the main query or the details query runs.
 - Polls every `refreshIntervalSec` seconds (default 10), plus a refresh when the popup opens.
 - Setup: the user runs `gh auth login` once.
 
@@ -75,6 +78,13 @@ The widget tells the user when a PR's **CI finished**, so they do not need to wa
 - Same rules as the AI review notification: none on the first poll after a start, none for a PR seen for the first time, and a failed poll does not change the last seen PRs.
 - Drafts are included. Each notification can be turned off in Settings.
 
+## Merged and closed notification
+
+- When a PR of the last successful poll is missing from the current one, the details query reads its state.
+- `MERGED`: title `PR merged by <login>`. `CLOSED`: title `PR closed by <login>`. The body uses the PR data from the last poll. Clicking it opens the PR.
+- Nothing is sent when the viewer merged or closed the PR, or when the state is still `OPEN`, for example a PR that fell out of the 50 most recently updated.
+- If the details query fails, that poll's merged and closed notifications are skipped. The other notifications are still sent, and the PR list still updates.
+
 ## Review and merge icons
 
 Icons on each row show if a PR is ready to merge. They do not change Status, Sections, or the Badge.
@@ -124,8 +134,10 @@ A gear button in the popup lets the user change the widget's settings without ed
 | `notifyAiReviewDone` | `true` | Send `AI review done`. |
 | `notifyCiPassed` | `true` | Send `CI passed`. |
 | `notifyCiFailed` | `true` | Send `CI failed`. |
+| `notifyMerged` | `true` | Send `PR merged by <login>`. |
+| `notifyClosed` | `true` | Send `PR closed by <login>`. |
 
-- The three toggles sit under the master switch, indented. When the master switch is off, they are greyed out and cannot be changed, but keep their values.
+- The other toggles sit under the master switch, indented. When the master switch is off, they are greyed out and cannot be changed, but keep their values.
 - Turning a notification off does not change how the last seen PRs are tracked, so turning it back on does not send old notifications.
 
 ### Manifest
@@ -143,3 +155,5 @@ A gear button in the popup lets the user change the widget's settings without ed
 - Only the first 100 review threads of a PR are read, so the Unresolved thread count is at most 100.
 - A Status change that starts and ends between two polls is missed, for example a new commit whose CI finishes in less than one poll interval.
 - The auth hint relies on `gh` printing "gh auth login" in its error output.
+- If the details query fails, that poll's merged and closed notifications are lost.
+- A PR merged or closed during the poll right after the AI check patterns change sends nothing, because that poll forgets the last seen PRs.
