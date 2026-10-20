@@ -161,6 +161,7 @@ FocusScope {
         SettingToggle { key: "notifyCiFailed"; label: "CI failed" }
         SettingToggle { key: "notifyApproved"; label: "PR approved" }
         SettingToggle { key: "notifyChangesRequested"; label: "Changes requested" }
+        SettingToggle { key: "notifyCodeComments"; label: "New code comments" }
         SettingToggle { key: "notifyMerged"; label: "PR merged" }
         SettingToggle { key: "notifyClosed"; label: "PR closed" }
       }

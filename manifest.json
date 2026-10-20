@@ -27,6 +27,7 @@
       "notifyCiFailed": true,
       "notifyApproved": true,
       "notifyChangesRequested": true,
+      "notifyCodeComments": true,
       "notifyMerged": true,
       "notifyClosed": true
     },
@@ -39,6 +40,7 @@
       { "key": "notifyCiFailed", "type": "boolean", "label": "Notify when CI failed" },
       { "key": "notifyApproved", "type": "boolean", "label": "Notify when a PR is approved" },
       { "key": "notifyChangesRequested", "type": "boolean", "label": "Notify when changes are requested" },
+      { "key": "notifyCodeComments", "type": "boolean", "label": "Notify on new code comments" },
       { "key": "notifyMerged", "type": "boolean", "label": "Notify when a PR is merged" },
       { "key": "notifyClosed", "type": "boolean", "label": "Notify when a PR is closed" }
     ]

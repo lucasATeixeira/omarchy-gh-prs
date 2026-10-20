@@ -545,6 +545,11 @@ describe('prIdsNeedingDetails', () => {
   it('is empty on the first poll', () => {
     assert.deepEqual(P.prIdsNeedingDetails(null, [withId(1)]), [])
   })
+
+  it('lists PRs whose updatedAt changed', () => {
+    const changed = Object.assign(withId(2), { updatedAt: '2026-10-20T10:00:00Z' })
+    assert.deepEqual(P.prIdsNeedingDetails([withId(1), withId(2)], [changed]), ['PR_1', 'PR_2'])
+  })
 })
 
 describe('detailsCommand', () => {
@@ -554,18 +559,30 @@ describe('detailsCommand', () => {
   })
 })
 
-const detailsNode = (state, mergedBy, closedBy) => ({
+const detailsNode = (state, mergedBy, closedBy, threads = []) => ({
   id: 'PR_1',
   state,
   mergedBy: mergedBy ? { login: mergedBy } : null,
-  timelineItems: { nodes: closedBy ? [{ actor: { login: closedBy } }] : [] }
+  timelineItems: { nodes: closedBy ? [{ actor: { login: closedBy } }] : [] },
+  reviewThreads: { nodes: threads }
 })
 const detailsResponse = (nodes) => JSON.stringify({ data: { nodes } })
+const commentThread = (...comments) => ({ comments: { nodes: comments } })
+const commentNode = (author, publishedAt) => ({ publishedAt, author: author ? { login: author } : null })
 
 describe('parseDetailsRun', () => {
   it('reads who merged a merged PR', () => {
     assert.deepEqual(P.parseDetailsRun(0, detailsResponse([detailsNode('MERGED', 'alice', 'alice')]), ''),
-      { details: [{ id: 'PR_1', state: 'MERGED', actor: 'alice' }], error: '' })
+      { details: [{ id: 'PR_1', state: 'MERGED', actor: 'alice', codeComments: [] }], error: '' })
+  })
+
+  it('reads the code comments of every review thread', () => {
+    const threads = [commentThread(commentNode('ana', 'T1'), commentNode('me', 'T2')), commentThread(commentNode(null, 'T3'))]
+    assert.deepEqual(P.parseDetailsRun(0, detailsResponse([detailsNode('OPEN', null, null, threads)]), '').details[0].codeComments, [
+      { author: 'ana', publishedAt: 'T1' },
+      { author: 'me', publishedAt: 'T2' },
+      { author: 'ghost', publishedAt: 'T3' }
+    ])
   })
 
   it('reads who closed a closed PR', () => {
@@ -622,5 +639,64 @@ describe('notificationEnabled merged and closed', () => {
       assert.equal(P.notificationEnabled({}, key), true, key)
       assert.equal(P.notificationEnabled({ [key]: false }, key), false, key)
     }
+  })
+})
+
+const comment = (author, publishedAt = '2026-10-19T11:00:00Z') => ({ author, publishedAt })
+const updated = () => Object.assign(withId(1), { updatedAt: '2026-10-19T12:00:00Z' })
+const commentDetails = (codeComments) => [{ id: 'PR_1', state: 'OPEN', actor: '', codeComments }]
+const commentNotifications = (codeComments) =>
+  sent(P.pollNotifications([withId(1)], [updated()], commentDetails(codeComments), 'me'))
+
+describe('pollNotifications code comments', () => {
+  it('names the author of a single new comment', () => {
+    assert.deepEqual(commentNotifications([comment('ana')]), [['notifyCodeComments', 'New code comment from ana', 1]])
+  })
+
+  it('counts many new comments in one notification', () => {
+    assert.deepEqual(commentNotifications([comment('ana'), comment('bob'), comment('ana')]),
+      [['notifyCodeComments', '3 new code comments', 1]])
+  })
+
+  it('skips the viewer\'s own comments', () => {
+    assert.deepEqual(commentNotifications([comment('me'), comment('me')]), [])
+    assert.deepEqual(commentNotifications([comment('me'), comment('ana')]), [['notifyCodeComments', 'New code comment from ana', 1]])
+  })
+
+  it('counts comments from bots', () => {
+    assert.deepEqual(commentNotifications([comment('coderabbitai')]), [['notifyCodeComments', 'New code comment from coderabbitai', 1]])
+  })
+
+  it('counts a reply in a resolved thread', () => {
+    const resolved = { isResolved: true, comments: { nodes: [commentNode('ana', '2026-10-19T09:00:00Z'), commentNode('bob', '2026-10-19T11:00:00Z')] } }
+    const { details } = P.parseDetailsRun(0, detailsResponse([detailsNode('OPEN', null, null, [resolved])]), '')
+    assert.deepEqual(sent(P.pollNotifications([withId(1)], [updated()], details, 'me')),
+      [['notifyCodeComments', 'New code comment from bob', 1]])
+  })
+
+  it('skips comments published before the previous poll', () => {
+    assert.deepEqual(commentNotifications([comment('ana', '2026-10-19T09:00:00Z'), comment('bob', '2026-10-19T10:00:00Z')]), [])
+  })
+
+  it('sends both the Review and the comments of the same poll', () => {
+    const now = Object.assign(updated(), { latestReviews: [review('R1', 'APPROVED')] })
+    assert.deepEqual(sent(P.pollNotifications([withId(1)], [now], commentDetails([comment('ana')]), 'me')), [
+      ['notifyApproved', 'Approved by ana', 1],
+      ['notifyCodeComments', 'New code comment from ana', 1]
+    ])
+  })
+
+  it('sends nothing on the first poll, for a new PR, or when details failed', () => {
+    assert.deepEqual(P.pollNotifications(null, [updated()], commentDetails([comment('ana')]), 'me'), [])
+    assert.deepEqual(P.pollNotifications([withId(2)], [updated()], commentDetails([comment('ana')]), 'me'), [])
+    assert.deepEqual(P.pollNotifications([withId(1)], [updated()], null, 'me'), [])
+  })
+})
+
+describe('notificationEnabled code comments', () => {
+  it('is on when the key is missing and off when it is false', () => {
+    assert.equal(P.notificationEnabled({}, 'notifyCodeComments'), true)
+    assert.equal(P.notificationEnabled({ notifyCodeComments: false }, 'notifyCodeComments'), false)
+    assert.equal(P.notificationEnabled({ notificationsEnabled: false }, 'notifyCodeComments'), false)
   })
 })

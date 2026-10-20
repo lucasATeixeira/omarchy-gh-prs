@@ -13,7 +13,7 @@ An Omarchy shell bar widget that shows the CI status of the user's open GitHub p
 - CI comes from the latest commit's `statusCheckRollup`. All **Checks** count, not only required ones.
 - The same query also reads each PR's `reviewDecision`, `mergeable`, and review threads' `isResolved`.
 - The same query also reads each PR's node `id` and the viewer's login. It costs 2 points, measured with `rateLimit(dryRun: true)`.
-- **Details query**: when PRs of the last successful poll are missing from the current one, a second query, `nodes(ids: ...)`, reads their `state`, `mergedBy`, and the actor of their latest `ClosedEvent`. It costs about 1 point per PR. It does not run on the first poll or when no PR is missing.
+- **Details query**: for PRs of the last successful poll that are missing from the current one or whose `updatedAt` changed, a second query, `nodes(ids: ...)`, reads their `state`, `mergedBy`, the actor of their latest `ClosedEvent`, and the latest 20 comments of each of the first 100 review threads, with author login and `publishedAt`. It costs about 1 point per PR, measured. It does not run on the first poll or when no PR needs it.
 - A new poll does not start while the main query or the details query runs.
 - Polls every `refreshIntervalSec` seconds (default 10), plus a refresh when the popup opens.
 - Setup: the user runs `gh auth login` once.
@@ -96,6 +96,15 @@ The widget tells the user when a reviewer approves a PR or requests changes. Thi
 - Nothing is sent when the viewer merged or closed the PR, or when the state is still `OPEN`, for example a PR that fell out of the 50 most recently updated.
 - If the details query fails, that poll's merged and closed notifications are skipped. The other notifications are still sent, and the PR list still updates.
 
+## Code comment notification
+
+- When a PR of the last successful poll has a new `updatedAt`, the details query reads its Code comments. A new Code comment changes `updatedAt`, checked on real PRs.
+- A Code comment counts when its `publishedAt` is later than the PR's `updatedAt` in the last poll and its author is not the viewer. New threads and replies count, in resolved threads too. Bot authors count.
+- One notification per PR per poll. Title `New code comment from <login>` for one comment, `<n> new code comments` for more. Body `owner/repo#123 — <PR title>`. Clicking it opens the PR.
+- A Review notification and a Code comment notification for the same PR in the same poll are both sent.
+- Same rules as the AI review notification: none on the first poll after a start, none for a PR seen for the first time, and drafts are included.
+- If the details query fails, that poll's Code comment notifications are skipped.
+
 ## Review and merge icons
 
 Icons on each row show if a PR is ready to merge. They do not change Status, Sections, or the Badge.
@@ -109,7 +118,7 @@ Icons on each row show if a PR is ready to merge. They do not change Status, Sec
   - `REVIEW_REQUIRED` or `null`: no icon.
 - Unresolved threads: `nf-md-comment_outline` followed by the number of review threads with `isResolved` false. Every thread counts: from any author, bots included, outdated included. Plain conversation comments are not counted, because they cannot be resolved. No icon when the count is 0.
 - Conflict: `nf-md-alert` when `mergeable` is `CONFLICTING`. `MERGEABLE` and `UNKNOWN` show no icon.
-- The review decision icon does not notify; Review notifications come from `latestReviews`, see "Review notification". No notifications for threads or conflicts.
+- The review decision icon does not notify; Review notifications come from `latestReviews`, see "Review notification". Code comments notify, see "Code comment notification". No notifications for conflicts.
 
 ## Settings
 
@@ -147,6 +156,7 @@ A gear button in the popup lets the user change the widget's settings without ed
 | `notifyCiFailed` | `true` | Send `CI failed`. |
 | `notifyApproved` | `true` | Send `Approved by <login>`. |
 | `notifyChangesRequested` | `true` | Send `Changes requested by <login>`. |
+| `notifyCodeComments` | `true` | Send `New code comment from <login>` or `<n> new code comments`. |
 | `notifyMerged` | `true` | Send `PR merged by <login>`. |
 | `notifyClosed` | `true` | Send `PR closed by <login>`. |
 
@@ -168,5 +178,7 @@ A gear button in the popup lets the user change the widget's settings without ed
 - Only the first 100 review threads of a PR are read, so the Unresolved thread count is at most 100.
 - A Status change that starts and ends between two polls is missed, for example a new commit whose CI finishes in less than one poll interval.
 - The auth hint relies on `gh` printing "gh auth login" in its error output.
-- If the details query fails, that poll's merged and closed notifications are lost.
+- If the details query fails, that poll's Code comment, merged, and closed notifications are lost.
+- Only the first 100 review threads of a PR and the latest 20 comments of each thread are read for Code comment notifications.
+- A Code comment that does not change the PR's `updatedAt` is missed.
 - A PR merged or closed during the poll right after the AI check patterns change sends nothing, because that poll forgets the last seen PRs.

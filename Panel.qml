@@ -29,7 +29,7 @@ Panel {
   // A notification setting missing here uses the GitHub icon.
   readonly property var notificationIcons: ({
     notifyAiReviewDone: iconAiReview, notifyApproved: iconApproved, notifyChangesRequested: iconChangesRequested,
-    notifyMerged: iconMerged, notifyClosed: iconClosed
+    notifyCodeComments: iconUnresolvedThreads, notifyMerged: iconMerged, notifyClosed: iconClosed
   })
 
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family

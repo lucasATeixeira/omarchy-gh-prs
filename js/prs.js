@@ -266,8 +266,12 @@ function toPullRequest(node, aiCheckPatterns) {
 }
 
 function toReview(node) {
+    return { id: node.id, state: node.state, author: authorLogin(node) };
+}
+
+function authorLogin(node) {
     // GitHub returns no author for a deleted account and shows it as "ghost".
-    return { id: node.id, state: node.state, author: node.author ? node.author.login : "ghost" };
+    return node.author ? node.author.login : "ghost";
 }
 
 /**
@@ -316,11 +320,19 @@ function ciNotificationTitle(status) {
 /** @typedef {"OPEN"|"MERGED"|"CLOSED"} PrState */
 
 /**
+ * A comment in a review thread of a PR.
+ * @typedef {Object} CodeComment
+ * @property {string} author Login of the writer.
+ * @property {string} publishedAt ISO 8601 timestamp.
+ */
+
+/**
  * What the details query read about one PR.
  * @typedef {Object} PrDetails
  * @property {string} id The PR's node id.
  * @property {PrState} state
  * @property {string} actor Login of who merged or closed the PR; empty when it was never closed.
+ * @property {CodeComment[]} codeComments The latest comments of each review thread.
  */
 
 /**
@@ -330,9 +342,10 @@ function ciNotificationTitle(status) {
  * @property {string} error
  */
 
-/** GraphQL query for the state of the PRs in `$ids` and who merged or closed each one. */
+/** GraphQL query for the state of the PRs in `$ids`, who merged or closed each one, and their latest Code comments. */
 var DETAILS_QUERY = "query($ids: [ID!]!) { nodes(ids: $ids) { ... on PullRequest { id state mergedBy { login }"
-    + " timelineItems(itemTypes: [CLOSED_EVENT], last: 1) { nodes { ... on ClosedEvent { actor { login } } } } } } }";
+    + " timelineItems(itemTypes: [CLOSED_EVENT], last: 1) { nodes { ... on ClosedEvent { actor { login } } } }"
+    + " reviewThreads(first: 100) { nodes { comments(last: 20) { nodes { publishedAt author { login } } } } } } } }";
 
 /**
  * The `gh` command that runs DETAILS_QUERY for these PR ids.
@@ -364,7 +377,13 @@ function parseDetailsRun(exitCode, stdout, stderr) {
 function toPrDetails(node) {
     var closedEvent = node.timelineItems.nodes[0];
     var actor = node.state === "MERGED" ? node.mergedBy.login : closedEvent ? closedEvent.actor.login : "";
-    return { id: node.id, state: node.state, actor: actor };
+    var codeComments = [];
+    node.reviewThreads.nodes.forEach(function (thread) {
+        thread.comments.nodes.forEach(function (comment) {
+            codeComments.push({ author: authorLogin(comment), publishedAt: comment.publishedAt });
+        });
+    });
+    return { id: node.id, state: node.state, actor: actor, codeComments: codeComments };
 }
 
 /**
@@ -383,7 +402,44 @@ function pollNotifications(previousPrs, currentPrs, details, viewerLogin) {
         return { setting: ciNotificationSetting(pr.status), title: ciNotificationTitle(pr.status), pr: pr };
     });
     return aiReviews.concat(ci, reviewNotifications(previousPrs, currentPrs),
+        codeCommentNotifications(previousPrs, currentPrs, details || [], viewerLogin),
         mergedOrClosed(previousPrs, currentPrs, details || [], viewerLogin));
+}
+
+/**
+ * One notification per PR that has Code comments from others published after the previous poll's `updatedAt`.
+ * @param {?PullRequest[]} previousPrs
+ * @param {PullRequest[]} currentPrs
+ * @param {PrDetails[]} details
+ * @param {string} viewerLogin
+ * @returns {Notification[]}
+ */
+function codeCommentNotifications(previousPrs, currentPrs, details, viewerLogin) {
+    var notifications = [];
+    currentPrs.forEach(function (now) {
+        var before = previousPr(previousPrs, now);
+        var prDetails = detailsFor(details, now);
+        if (before === undefined || prDetails === undefined) return;
+        var newComments = prDetails.codeComments.filter(function (comment) {
+            return comment.publishedAt > before.updatedAt && comment.author !== viewerLogin;
+        });
+        if (newComments.length === 0) return;
+        var title = newComments.length === 1
+            ? "New code comment from " + newComments[0].author
+            : newComments.length + " new code comments";
+        notifications.push({ setting: "notifyCodeComments", title: title, pr: now });
+    });
+    return notifications;
+}
+
+/**
+ * The details of one PR, matched by node id.
+ * @param {PrDetails[]} details
+ * @param {PullRequest} pr
+ * @returns {PrDetails|undefined}
+ */
+function detailsFor(details, pr) {
+    return details.find(function (d) { return d.id === pr.id; });
 }
 
 var MERGED_OR_CLOSED = {
@@ -402,7 +458,7 @@ var MERGED_OR_CLOSED = {
 function mergedOrClosed(previousPrs, currentPrs, details, viewerLogin) {
     var notifications = [];
     missingSincePoll(previousPrs, currentPrs).forEach(function (pr) {
-        var prDetails = details.find(function (d) { return d.id === pr.id; });
+        var prDetails = detailsFor(details, pr);
         var event = prDetails && MERGED_OR_CLOSED[prDetails.state];
         if (!event || prDetails.actor === viewerLogin) return;
         notifications.push({ setting: event.setting, title: "PR " + event.verb + " by " + prDetails.actor, pr: pr });
@@ -482,13 +538,16 @@ function missingSincePoll(previousPrs, currentPrs) {
 }
 
 /**
- * Ids of the PRs the details query must read: those missing since the previous poll.
+ * Ids of the PRs the details query must read: those missing since the previous poll, or whose `updatedAt` changed.
  * @param {?PullRequest[]} previousPrs Null before the first successful poll.
  * @param {PullRequest[]} currentPrs
  * @returns {string[]}
  */
 function prIdsNeedingDetails(previousPrs, currentPrs) {
-    return missingSincePoll(previousPrs, currentPrs).map(function (pr) { return pr.id; });
+    var updated = changedSincePoll(previousPrs, currentPrs, function (before, now) {
+        return before.updatedAt !== now.updatedAt;
+    });
+    return missingSincePoll(previousPrs, currentPrs).concat(updated).map(function (pr) { return pr.id; });
 }
 
 /**
@@ -544,13 +603,14 @@ function themeColors(toml) {
  * @property {boolean} [notifyCiFailed]
  * @property {boolean} [notifyApproved]
  * @property {boolean} [notifyChangesRequested]
+ * @property {boolean} [notifyCodeComments]
  * @property {boolean} [notifyMerged]
  * @property {boolean} [notifyClosed]
  */
 
 /**
  * @typedef {"notifyAiReviewDone"|"notifyCiPassed"|"notifyCiFailed"|"notifyApproved"|"notifyChangesRequested"
- *     |"notifyMerged"|"notifyClosed"} NotificationSetting
+ *     |"notifyCodeComments"|"notifyMerged"|"notifyClosed"} NotificationSetting
  */
 
 var REFRESH_INTERVAL_MIN_SEC = 5;
