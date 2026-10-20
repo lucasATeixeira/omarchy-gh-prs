@@ -519,6 +519,7 @@ Panel {
           focusable: false
           foreground: root.foreground
           fontFamily: root.fontFamily
+          fontSize: Style.font.bodySmall
           onChanged: function(value) { root.selectTab(root.tabs.findIndex(function(tab) { return tab.name === value })) }
         }
 

@@ -61,3 +61,4 @@ The spec lives in `.agent/scratch/gh-prs/spec.md`, and the domain terms are defi
 
 # Ideas
 - Add a refresh button
+- Add a `filter out prs with more then X days old` and add that to settings page so user can chose. It can be null, if it's null we don't filter out
