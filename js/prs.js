@@ -281,6 +281,38 @@ function ciNotificationTitle(status) {
 }
 
 /**
+ * A desktop notification about a PR, sent only when its setting is on.
+ * @typedef {Object} Notification
+ * @property {NotificationSetting} setting
+ * @property {string} title
+ * @property {PullRequest} pr
+ */
+
+/**
+ * What the details query read about one PR.
+ * @typedef {Object} PrDetails
+ * @property {string} id The PR's node id.
+ */
+
+/**
+ * The notifications one successful poll sends, compared with the previous successful poll.
+ * @param {?PullRequest[]} previousPrs Null before the first successful poll.
+ * @param {PullRequest[]} currentPrs
+ * @param {?PrDetails[]} details Null when the details query did not run or failed.
+ * @param {string} viewerLogin
+ * @returns {Notification[]}
+ */
+function pollNotifications(previousPrs, currentPrs, details, viewerLogin) {
+    var aiReviews = finishedAiReviews(previousPrs, currentPrs).map(function (pr) {
+        return { setting: "notifyAiReviewDone", title: "AI review done", pr: pr };
+    });
+    var ci = finishedCi(previousPrs, currentPrs).map(function (pr) {
+        return { setting: ciNotificationSetting(pr.status), title: ciNotificationTitle(pr.status), pr: pr };
+    });
+    return aiReviews.concat(ci);
+}
+
+/**
  * Current PRs that `changed` accepts against the same PR, matched by URL, in the previous poll.
  * @param {?PullRequest[]} previousPrs
  * @param {PullRequest[]} currentPrs
@@ -403,6 +435,7 @@ if (typeof module !== "undefined") {
         finishedCi: finishedCi,
         ciNotificationTitle: ciNotificationTitle,
         ciNotificationSetting: ciNotificationSetting,
+        pollNotifications: pollNotifications,
         notificationEnabled: notificationEnabled,
         settingOn: settingOn,
         REFRESH_INTERVAL_MIN_SEC: REFRESH_INTERVAL_MIN_SEC,

@@ -24,6 +24,8 @@ Panel {
   readonly property string iconSettings: "󰒓" // nf-md-cog
   readonly property string iconBack: "󰁍" // nf-md-arrow_left
   readonly property var reviewDecisionIcons: ({ APPROVED: iconApproved, CHANGES_REQUESTED: iconChangesRequested })
+  // A notification setting missing here uses the GitHub icon.
+  readonly property var notificationIcons: ({ notifyAiReviewDone: iconAiReview })
 
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
@@ -86,12 +88,14 @@ Panel {
     keyCatcher.forceActiveFocus()
   }
 
-  // Sends a desktop notification about a PR when its setting allows it; clicking it opens the PR.
-  function notify(setting, icon, title, pr) {
-    if (!Prs.notificationEnabled(root.settings, setting)) return
+  // Sends a desktop notification when its setting allows it; clicking it opens the PR.
+  function notify(notification) {
+    if (!Prs.notificationEnabled(root.settings, notification.setting)) return
+    var pr = notification.pr
     Util.execArgv([
-      "omarchy-notification-send", "--app-name", "GitHub PRs", "-g", icon,
-      title, pr.repo + "#" + pr.number + " — " + pr.title,
+      "omarchy-notification-send", "--app-name", "GitHub PRs",
+      "-g", root.notificationIcons[notification.setting] || root.iconGithub,
+      notification.title, pr.repo + "#" + pr.number + " — " + pr.title,
       "--exec", "xdg-open", pr.url
     ])
   }
@@ -114,12 +118,7 @@ Panel {
       var result = Prs.parseRun(exitCode, String(fetchStdout.text), String(fetchStderr.text),
                                 root.aiCheckNames)
       if (result.error === "") {
-        Prs.finishedAiReviews(root.lastPrs, result.prs).forEach(function(pr) {
-          root.notify("notifyAiReviewDone", root.iconAiReview, "AI review done", pr)
-        })
-        Prs.finishedCi(root.lastPrs, result.prs).forEach(function(pr) {
-          root.notify(Prs.ciNotificationSetting(pr.status), root.iconGithub, Prs.ciNotificationTitle(pr.status), pr)
-        })
+        Prs.pollNotifications(root.lastPrs, result.prs, null, "").forEach(root.notify)
         root.lastPrs = result.prs
       }
       root.prs = result.prs

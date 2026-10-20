@@ -421,3 +421,35 @@ describe('notificationEnabled', () => {
     assert.equal(P.notificationEnabled({ notifyCiPassed: false, notifyAiReviewDone: false }, 'notifyCiFailed'), true)
   })
 })
+
+const polled = (number, status, aiReviewDone) => Object.assign(pr(status, undefined, number), { url: 'u' + number, aiReviewDone })
+const sent = (notifications) => notifications.map(n => [n.setting, n.title, n.pr.number])
+
+describe('pollNotifications', () => {
+  it('notifies when the AI review is done', () => {
+    const notifications = P.pollNotifications([polled(1, 'none', false)], [polled(1, 'none', true)], null, 'me')
+    assert.deepEqual(sent(notifications), [['notifyAiReviewDone', 'AI review done', 1]])
+  })
+
+  it('notifies when CI passed or failed', () => {
+    const previous = [polled(1, 'running', false), polled(2, 'running', false)]
+    const current = [polled(1, 'passing', false), polled(2, 'failing', false)]
+    assert.deepEqual(sent(P.pollNotifications(previous, current, null, 'me')), [
+      ['notifyCiPassed', 'CI passed', 1],
+      ['notifyCiFailed', 'CI failed', 2]
+    ])
+  })
+
+  it('sends both when the AI review and CI finish in the same poll', () => {
+    const notifications = P.pollNotifications([polled(1, 'running', false)], [polled(1, 'passing', true)], null, 'me')
+    assert.deepEqual(sent(notifications), [['notifyAiReviewDone', 'AI review done', 1], ['notifyCiPassed', 'CI passed', 1]])
+  })
+
+  it('sends nothing on the first poll', () => {
+    assert.deepEqual(P.pollNotifications(null, [polled(1, 'passing', true)], null, 'me'), [])
+  })
+
+  it('sends nothing for a PR seen for the first time', () => {
+    assert.deepEqual(P.pollNotifications([polled(1, 'running', false)], [polled(2, 'passing', true)], null, 'me'), [])
+  })
+})
