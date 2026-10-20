@@ -75,12 +75,13 @@ Panel {
     if (bar) bar.shell.updateEntryInline(root.moduleName, root.settings)
   }
 
-  // Polls right away and forgets the last seen PRs, so newly matched AI Checks do not all notify at once.
+  // Polls right away and forgets the last seen PRs and any pending poll, so newly matched AI Checks do not all notify at once.
   function saveAiCheckPatterns(patterns) {
     var aiCheckNames = Prs.joinAiCheckPatterns(patterns)
     if (aiCheckNames === Prs.joinAiCheckPatterns(Prs.parseAiCheckPatterns(root.aiCheckNames))) return
     saveSettings({ aiCheckNames: aiCheckNames })
     root.lastPrs = null
+    root.pendingPoll = null
     refresh()
   }
 
@@ -107,7 +108,7 @@ Panel {
     ])
   }
 
-  // Sends the notifications of a successful poll and remembers its PRs; null details skip the rules that need them.
+  // Sends the poll's notifications and keeps its PRs for the next poll.
   function finishPoll(poll, details) {
     Prs.pollNotifications(root.lastPrs, poll.prs, details, poll.viewerLogin).forEach(root.notify)
     root.lastPrs = poll.prs
@@ -152,7 +153,8 @@ Panel {
     stderr: StdioCollector { id: detailsStderr; waitForEnd: true }
     onExited: function(exitCode) {
       var result = Prs.parseDetailsRun(exitCode, String(detailsStdout.text), String(detailsStderr.text))
-      root.finishPoll(root.pendingPoll, result.error === "" ? result.details : null)
+      // A pending poll cleared by a pattern change is dropped.
+      if (root.pendingPoll) root.finishPoll(root.pendingPoll, result.error === "" ? result.details : null)
       root.pendingPoll = null
     }
   }

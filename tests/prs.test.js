@@ -444,14 +444,6 @@ describe('notificationEnabled', () => {
     }
   })
 
-  it('treats the review toggles like the others', () => {
-    for (const key of ['notifyApproved', 'notifyChangesRequested']) {
-      assert.equal(P.notificationEnabled({}, key), true, key)
-      assert.equal(P.notificationEnabled({ [key]: false }, key), false, key)
-      assert.equal(P.notificationEnabled({ notificationsEnabled: false }, key), false, key)
-    }
-  })
-
   it('ignores the other toggles', () => {
     assert.equal(P.notificationEnabled({ notifyCiPassed: false, notifyAiReviewDone: false }, 'notifyCiFailed'), true)
   })
@@ -589,6 +581,15 @@ describe('parseDetailsRun', () => {
     assert.equal(P.parseDetailsRun(0, detailsResponse([detailsNode('CLOSED', null, 'bob')]), '').details[0].actor, 'bob')
   })
 
+  it('names a deleted merger ghost', () => {
+    assert.equal(P.parseDetailsRun(0, detailsResponse([detailsNode('MERGED', null, null)]), '').details[0].actor, 'ghost')
+  })
+
+  it('names a deleted closer ghost', () => {
+    const node = Object.assign(detailsNode('CLOSED', null, null), { timelineItems: { nodes: [{ actor: null }] } })
+    assert.equal(P.parseDetailsRun(0, detailsResponse([node]), '').details[0].actor, 'ghost')
+  })
+
   it('has no actor for an open PR that was never closed', () => {
     assert.equal(P.parseDetailsRun(0, detailsResponse([detailsNode('OPEN', null, null)]), '').details[0].actor, '')
   })
@@ -606,7 +607,7 @@ describe('parseDetailsRun', () => {
 const details = (state, actor) => [{ id: 'PR_1', state, actor }]
 
 describe('pollNotifications merged and closed', () => {
-  it('notifies when someone else merged the PR, with the PR from the previous poll', () => {
+  it('notifies when someone else merged the PR', () => {
     const notifications = P.pollNotifications([withId(1)], [], details('MERGED', 'alice'), 'me')
     assert.deepEqual(sent(notifications), [['notifyMerged', 'PR merged by alice', 1]])
     assert.equal(notifications[0].pr.url, 'u1')
@@ -626,19 +627,10 @@ describe('pollNotifications merged and closed', () => {
     assert.deepEqual(P.pollNotifications([withId(1)], [], details('OPEN', ''), 'me'), [])
   })
 
-  it('skips merged and closed but keeps the other notifications when details failed', () => {
+  it('keeps the other notifications when details failed', () => {
     const previous = [withId(1), Object.assign(withId(2), { status: 'running' })]
     const current = [Object.assign(withId(2), { status: 'passing' })]
     assert.deepEqual(sent(P.pollNotifications(previous, current, null, 'me')), [['notifyCiPassed', 'CI passed', 2]])
-  })
-})
-
-describe('notificationEnabled merged and closed', () => {
-  it('is on when the key is missing and off when it is false', () => {
-    for (const key of ['notifyMerged', 'notifyClosed']) {
-      assert.equal(P.notificationEnabled({}, key), true, key)
-      assert.equal(P.notificationEnabled({ [key]: false }, key), false, key)
-    }
   })
 })
 
@@ -686,17 +678,35 @@ describe('pollNotifications code comments', () => {
     ])
   })
 
-  it('sends nothing on the first poll, for a new PR, or when details failed', () => {
+  it('sends nothing on the first poll', () => {
     assert.deepEqual(P.pollNotifications(null, [updated()], commentDetails([comment('ana')]), 'me'), [])
+  })
+
+  it('sends nothing for a PR seen for the first time', () => {
     assert.deepEqual(P.pollNotifications([withId(2)], [updated()], commentDetails([comment('ana')]), 'me'), [])
+  })
+
+  it('sends nothing when details failed', () => {
     assert.deepEqual(P.pollNotifications([withId(1)], [updated()], null, 'me'), [])
   })
 })
 
-describe('notificationEnabled code comments', () => {
-  it('is on when the key is missing and off when it is false', () => {
-    assert.equal(P.notificationEnabled({}, 'notifyCodeComments'), true)
-    assert.equal(P.notificationEnabled({ notifyCodeComments: false }, 'notifyCodeComments'), false)
-    assert.equal(P.notificationEnabled({ notificationsEnabled: false }, 'notifyCodeComments'), false)
+describe('notificationEnabled activity toggles', () => {
+  const keys = ['notifyApproved', 'notifyChangesRequested', 'notifyMerged', 'notifyClosed', 'notifyCodeComments']
+
+  it('is on when the key is missing', () => {
+    for (const key of keys) assert.equal(P.notificationEnabled({}, key), true, key)
+  })
+
+  it('is on when the master switch and its toggle are on', () => {
+    for (const key of keys) assert.equal(P.notificationEnabled({ notificationsEnabled: true, [key]: true }, key), true, key)
+  })
+
+  it('is off when its own toggle is off', () => {
+    for (const key of keys) assert.equal(P.notificationEnabled({ [key]: false }, key), false, key)
+  })
+
+  it('is off when the master switch is off', () => {
+    for (const key of keys) assert.equal(P.notificationEnabled({ notificationsEnabled: false, [key]: true }, key), false, key)
   })
 })

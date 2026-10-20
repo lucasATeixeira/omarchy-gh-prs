@@ -266,12 +266,12 @@ function toPullRequest(node, aiCheckPatterns) {
 }
 
 function toReview(node) {
-    return { id: node.id, state: node.state, author: authorLogin(node) };
+    return { id: node.id, state: node.state, author: userLogin(node.author) };
 }
 
-function authorLogin(node) {
-    // GitHub returns no author for a deleted account and shows it as "ghost".
-    return node.author ? node.author.login : "ghost";
+function userLogin(user) {
+    // GitHub returns no user for a deleted account and shows it as "ghost".
+    return user ? user.login : "ghost";
 }
 
 /**
@@ -376,11 +376,11 @@ function parseDetailsRun(exitCode, stdout, stderr) {
 
 function toPrDetails(node) {
     var closedEvent = node.timelineItems.nodes[0];
-    var actor = node.state === "MERGED" ? node.mergedBy.login : closedEvent ? closedEvent.actor.login : "";
+    var actor = node.state === "MERGED" ? userLogin(node.mergedBy) : closedEvent ? userLogin(closedEvent.actor) : "";
     var codeComments = [];
     node.reviewThreads.nodes.forEach(function (thread) {
         thread.comments.nodes.forEach(function (comment) {
-            codeComments.push({ author: authorLogin(comment), publishedAt: comment.publishedAt });
+            codeComments.push({ author: userLogin(comment.author), publishedAt: comment.publishedAt });
         });
     });
     return { id: node.id, state: node.state, actor: actor, codeComments: codeComments };
@@ -403,7 +403,7 @@ function pollNotifications(previousPrs, currentPrs, details, viewerLogin) {
     });
     return aiReviews.concat(ci, reviewNotifications(previousPrs, currentPrs),
         codeCommentNotifications(previousPrs, currentPrs, details || [], viewerLogin),
-        mergedOrClosed(previousPrs, currentPrs, details || [], viewerLogin));
+        mergedOrClosedNotifications(previousPrs, currentPrs, details || [], viewerLogin));
 }
 
 /**
@@ -442,9 +442,17 @@ function detailsFor(details, pr) {
     return details.find(function (d) { return d.id === pr.id; });
 }
 
+/**
+ * How a PR state or Review state is announced.
+ * @typedef {Object} StateNotification
+ * @property {NotificationSetting} setting
+ * @property {string} titlePrefix Followed by the login of who caused the state.
+ */
+
+/** PR states that notify; other states send nothing. */
 var MERGED_OR_CLOSED = {
-    MERGED: { setting: "notifyMerged", verb: "merged" },
-    CLOSED: { setting: "notifyClosed", verb: "closed" }
+    MERGED: { setting: "notifyMerged", titlePrefix: "PR merged by " },
+    CLOSED: { setting: "notifyClosed", titlePrefix: "PR closed by " }
 };
 
 /**
@@ -455,23 +463,16 @@ var MERGED_OR_CLOSED = {
  * @param {string} viewerLogin
  * @returns {Notification[]}
  */
-function mergedOrClosed(previousPrs, currentPrs, details, viewerLogin) {
+function mergedOrClosedNotifications(previousPrs, currentPrs, details, viewerLogin) {
     var notifications = [];
     missingSincePoll(previousPrs, currentPrs).forEach(function (pr) {
         var prDetails = detailsFor(details, pr);
         var event = prDetails && MERGED_OR_CLOSED[prDetails.state];
         if (!event || prDetails.actor === viewerLogin) return;
-        notifications.push({ setting: event.setting, title: "PR " + event.verb + " by " + prDetails.actor, pr: pr });
+        notifications.push({ setting: event.setting, title: event.titlePrefix + prDetails.actor, pr: pr });
     });
     return notifications;
 }
-
-/**
- * How a Review state is announced.
- * @typedef {Object} ReviewNotification
- * @property {NotificationSetting} setting
- * @property {string} titlePrefix Followed by the reviewer's login.
- */
 
 /** Review states that notify; other states send nothing. */
 var REVIEW_NOTIFICATIONS = {

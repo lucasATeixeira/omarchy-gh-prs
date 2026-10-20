@@ -181,4 +181,5 @@ A gear button in the popup lets the user change the widget's settings without ed
 - If the details query fails, that poll's Code comment, merged, and closed notifications are lost.
 - Only the first 100 review threads of a PR and the latest 20 comments of each thread are read for Code comment notifications.
 - A Code comment that does not change the PR's `updatedAt` is missed.
+- A Code comment published in the same second as the PR's previous `updatedAt` is missed, because timestamps have whole seconds.
 - A PR merged or closed during the poll right after the AI check patterns change sends nothing, because that poll forgets the last seen PRs.

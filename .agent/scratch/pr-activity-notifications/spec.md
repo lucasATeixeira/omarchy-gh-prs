@@ -134,4 +134,5 @@ The widget stays cheap on the GitHub API. The main poll costs the same as today.
   - If the details query fails, that poll's Code comment, Merged, and Closed notifications are lost.
   - A PR merged or closed during the poll right after the AI check patterns change sends nothing, because that poll forgets the last seen PRs.
   - A Code comment that does not change the PR's `updatedAt` is missed. See the ASSUMPTION above.
+  - A Code comment published in the same second as the PR's previous `updatedAt` is missed, because timestamps have whole seconds.
 - Glossary terms used here: Review, Code comment, Merged, Closed. They are defined in `.agent/GLOSSARY.md`.
