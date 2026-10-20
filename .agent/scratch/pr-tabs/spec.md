@@ -1,6 +1,6 @@
 # Spec: Authored and To review Tabs
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
