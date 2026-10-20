@@ -25,7 +25,8 @@ Panel {
   readonly property string iconBack: "󰁍" // nf-md-arrow_left
   readonly property string iconMerged: "󰘭" // nf-md-source_merge
   readonly property string iconClosed: "󰅙" // nf-md-close_circle
-  readonly property var reviewDecisionIcons: ({ APPROVED: iconApproved, CHANGES_REQUESTED: iconChangesRequested })
+  // Approved has no icon here because the approval count shows it.
+  readonly property var reviewDecisionIcons: ({ CHANGES_REQUESTED: iconChangesRequested })
   // A notification setting missing here uses the GitHub icon.
   readonly property var notificationIcons: ({
     notifyAiReviewDone: iconAiReview, notifyApproved: iconApproved, notifyChangesRequested: iconChangesRequested,
@@ -454,6 +455,11 @@ Panel {
                     RowIcon {
                       visible: row.modelData.aiReviewDone
                       text: root.iconAiReview
+                    }
+
+                    RowIcon {
+                      visible: row.modelData.approvalCount > 0
+                      text: root.iconApproved + " " + row.modelData.approvalCount
                     }
 
                     RowIcon {

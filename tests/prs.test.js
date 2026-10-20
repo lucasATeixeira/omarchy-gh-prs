@@ -71,6 +71,7 @@ describe('parseRun success', () => {
         aiReviewDone: false,
         reviewDecision: 'APPROVED',
         unresolvedThreadCount: 0,
+        approvalCount: 0,
         hasConflict: false,
         latestReviews: []
       }],
@@ -266,6 +267,28 @@ describe('parseRun latest reviews', () => {
 
   it('names a deleted author ghost', () => {
     assert.equal(latestReviewsFor([{ id: 'R1', state: 'APPROVED', author: null }])[0].author, 'ghost')
+  })
+})
+
+const reviewNode = (id, state) => ({ id, state, author: { login: 'user-' + id } })
+const approvalCountFor = (reviews) => P.parseRun(0, response([prNode({ latestReviews: { nodes: reviews } })]), '', '').prs[0].approvalCount
+
+describe('parseRun approvals', () => {
+  it('counts Approvals', () => {
+    assert.equal(approvalCountFor([reviewNode('R1', 'APPROVED'), reviewNode('R2', 'APPROVED')]), 2)
+  })
+
+  it('is 0 when the PR has no reviews', () => {
+    assert.equal(approvalCountFor([]), 0)
+  })
+
+  it('ignores reviews that do not approve', () => {
+    const reviews = [reviewNode('R1', 'APPROVED'), reviewNode('R2', 'CHANGES_REQUESTED'), reviewNode('R3', 'COMMENTED'), reviewNode('R4', 'PENDING')]
+    assert.equal(approvalCountFor(reviews), 1)
+  })
+
+  it('ignores dismissed approvals', () => {
+    assert.equal(approvalCountFor([reviewNode('R1', 'DISMISSED')]), 0)
   })
 })
 

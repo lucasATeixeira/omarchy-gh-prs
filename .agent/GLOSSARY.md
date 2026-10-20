@@ -28,7 +28,9 @@
 
 **Unresolved thread**: a review comment thread on a PR's code that nobody has marked as resolved. _Avoid_: open comment, pending comment.
 
-**Review**: one reviewer's verdict on a PR: approved, changes requested, or only comments. Each reviewer's latest Review counts. Unlike the Review decision, a PR has Reviews even when its repo requires none. _Avoid_: approval, review status.
+**Review**: one reviewer's verdict on a PR: approved, changes requested, or only comments. Each reviewer's latest Review counts. Unlike the Review decision, a PR has Reviews even when its repo requires none. _Avoid_: review status.
+
+**Approval**: a reviewer's latest Review when its verdict is approved. A PR's approval count is how many Approvals it has. A dismissed approval is not an Approval. _Avoid_: approved review, sign-off.
 
 **Code comment**: a comment on a line of a PR's code. It is the first comment of a review thread or a reply in one. _Avoid_: review comment, inline comment.
 

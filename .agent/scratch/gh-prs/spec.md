@@ -109,16 +109,16 @@ The widget tells the user when a reviewer approves a PR or requests changes. Thi
 
 Icons on each row show if a PR is ready to merge. They do not change Status, Sections, or the Badge.
 
-- Row order: Status dot, robot, **Review decision** icon, **Unresolved thread** icon with count, **Conflict** icon, then `owner/repo#123`, the title, and "draft".
+- Row order: Status dot, robot, **Approval** icon with count, **Review decision** icon, **Unresolved thread** icon with count, **Conflict** icon, then `owner/repo#123`, the title, and "draft".
 - Each icon is hidden when it does not apply, so it takes no space.
 - All row icons, the robot included, use the `caption` font size and the normal text color.
+- Approvals: `nf-md-check_circle` followed by the PR's approval count: the reviewers whose latest Review in `latestReviews` is `APPROVED`. Dismissed reviews do not count; bot approvals do. It shows whatever the Review decision is, so a PR can show it next to the changes-requested icon. No icon when the count is 0.
 - Review decision, from the PR's `reviewDecision`:
-  - `APPROVED`: `nf-md-check_circle`.
   - `CHANGES_REQUESTED`: `nf-md-file_document_edit`.
-  - `REVIEW_REQUIRED` or `null`: no icon.
+  - `APPROVED`, `REVIEW_REQUIRED`, or `null`: no icon. The Approval icon already shows approvals.
 - Unresolved threads: `nf-md-comment_outline` followed by the number of review threads with `isResolved` false. Every thread counts: from any author, bots included, outdated included. Plain conversation comments are not counted, because they cannot be resolved. No icon when the count is 0.
 - Conflict: `nf-md-alert` when `mergeable` is `CONFLICTING`. `MERGEABLE` and `UNKNOWN` show no icon.
-- The review decision icon does not notify; Review notifications come from `latestReviews`, see "Review notification". Code comments notify, see "Code comment notification". No notifications for conflicts.
+- The Approval and review decision icons do not notify; Review notifications come from `latestReviews`, see "Review notification". Code comments notify, see "Code comment notification". No notifications for conflicts.
 
 ## Settings
 

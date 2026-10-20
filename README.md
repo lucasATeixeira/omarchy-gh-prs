@@ -6,7 +6,7 @@ The bar shows the GitHub icon with a badge: the worst CI status among your PRs a
 
 When a PR's checks stop running and pass or fail, you get a notification. You also get one when a reviewer approves a PR or requests changes, when someone else writes new code comments, and when someone else merges or closes your PR. Click it to open the PR. Each notification can be turned off in Settings.
 
-A PR's row shows a check icon when the PR is approved, and a document icon when changes are requested. A comment icon with a number shows how many review threads are still unresolved. An alert icon shows when the PR has merge conflicts.
+A check icon with a number shows how many reviewers approved a PR, and a document icon shows when changes are requested. A comment icon with a number shows how many review threads are still unresolved. An alert icon shows when the PR has merge conflicts.
 
 ## Requirements
 

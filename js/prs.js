@@ -41,6 +41,7 @@
  * @property {boolean} aiReviewDone
  * @property {?ReviewDecision} reviewDecision Null when the repo requires no review.
  * @property {number} unresolvedThreadCount
+ * @property {number} approvalCount Number of Approvals.
  * @property {boolean} hasConflict
  * @property {Review[]} latestReviews One per reviewer.
  */
@@ -248,6 +249,7 @@ function parseRun(exitCode, stdout, stderr, aiCheckNames) {
 function toPullRequest(node, aiCheckPatterns) {
     var rollup = node.commits.nodes[0].commit.statusCheckRollup;
     var checks = rollup ? rollup.contexts.nodes : [];
+    var latestReviews = node.latestReviews.nodes.map(toReview);
     return {
         id: node.id,
         repo: node.repository.nameWithOwner,
@@ -260,8 +262,9 @@ function toPullRequest(node, aiCheckPatterns) {
         aiReviewDone: aiReviewDone(checks, aiCheckPatterns),
         reviewDecision: node.reviewDecision,
         unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length,
+        approvalCount: latestReviews.filter(function (review) { return review.state === "APPROVED"; }).length,
         hasConflict: node.mergeable === "CONFLICTING",
-        latestReviews: node.latestReviews.nodes.map(toReview)
+        latestReviews: latestReviews
     };
 }
 
