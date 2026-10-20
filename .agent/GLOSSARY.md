@@ -4,6 +4,8 @@
 
 **PR to review**: an open PR where GitHub waits for the user's Review, because someone asked the user or one of the user's teams. It leaves the list when the user submits a Review, and comes back when someone asks again. _Avoid_: review request, reviewing PR.
 
+**Stale PR**: a PR whose last update is older than the max age the user chose for its Tab. The popup and the Badge hide Stale PRs, but they still send notifications. _Avoid_: old PR, expired PR.
+
 **Tab**: one of the two lists in the popup: Authored, with the Authored PRs, and To review, with the PRs to review. _Avoid_: page, view.
 
 **Check**: one CI result on a PR's latest commit. In the GitHub API it is a `CheckRun` (GitHub Actions and apps) or a `StatusContext` (commit statuses). _Avoid_: job, build.
@@ -18,7 +20,7 @@
 
 **Worst Status**: the first Status present in the order `failing` > `running` > `passing` > `none`.
 
-**Bar summary**: the worst Status among all Authored PRs, plus how many Authored PRs have it. A Bar summary of `none` has a count of 0.
+**Bar summary**: the worst Status among the Authored PRs that are not Stale, plus how many of them have it. A Bar summary of `none` has a count of 0.
 
 **Badge**: the colored disc on the GitHub icon in the bar that shows the Bar summary, or `✕` on error. _Avoid_: indicator, pill.
 
