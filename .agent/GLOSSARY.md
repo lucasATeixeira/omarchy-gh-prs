@@ -1,5 +1,11 @@
 # Glossary
 
+**Authored PR**: an open PR that the user opened. _Avoid_: my PR, own PR.
+
+**PR to review**: an open PR where GitHub waits for the user's Review, because someone asked the user or one of the user's teams. It leaves the list when the user submits a Review, and comes back when someone asks again. _Avoid_: review request, reviewing PR.
+
+**Tab**: one of the two lists in the popup: Authored, with the Authored PRs, and To review, with the PRs to review. _Avoid_: page, view.
+
 **Check**: one CI result on a PR's latest commit. In the GitHub API it is a `CheckRun` (GitHub Actions and apps) or a `StatusContext` (commit statuses). _Avoid_: job, build.
 
 **AI Check**: a Check made by an AI code reviewer, such as CodeRabbit. A Check is an AI Check when its name matches an AI check pattern. An AI Check still counts toward its PR's Status like any other Check. _Avoid_: AI review, bot review.
@@ -12,7 +18,7 @@
 
 **Worst Status**: the first Status present in the order `failing` > `running` > `passing` > `none`.
 
-**Bar summary**: the worst Status among all PRs, plus how many PRs have it. A Bar summary of `none` has a count of 0.
+**Bar summary**: the worst Status among all Authored PRs, plus how many Authored PRs have it. A Bar summary of `none` has a count of 0.
 
 **Badge**: the colored disc on the GitHub icon in the bar that shows the Bar summary, or `✕` on error. _Avoid_: indicator, pill.
 

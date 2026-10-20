@@ -50,7 +50,6 @@ Panel {
   readonly property int refreshIntervalSec: Prs.refreshIntervalSec(setting("refreshIntervalSec", 10))
 
   readonly property var summary: Prs.barSummary(prs)
-  readonly property var prSections: Prs.sections(prs)
   // An error shows as a red mark instead of a count.
   readonly property string badgeStatus: error !== "" ? "failing" : summary.status
   readonly property string badgeLabel: error !== "" ? iconError : String(summary.count)
@@ -215,6 +214,164 @@ Panel {
     }
   }
 
+  // The error, the empty text, and the Sections of one list of PRs.
+  component PrList: Column {
+    id: list
+
+    property var prs: []
+    property string emptyText: ""
+    readonly property var prSections: Prs.sections(prs)
+
+    spacing: Style.space(10)
+
+    Text {
+      visible: root.error !== ""
+      width: parent.width
+      text: root.error
+      textFormat: Text.PlainText
+      wrapMode: Text.Wrap
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+      color: root.colorFor("failing")
+    }
+
+    Text {
+      visible: root.loaded && root.error === "" && list.prs.length === 0
+      text: list.emptyText
+      textFormat: Text.PlainText
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.body
+      color: Commons.Color.muted
+    }
+
+    Repeater {
+      model: root.error === "" ? list.prSections : []
+
+      delegate: Column {
+        id: section
+        required property var modelData
+        width: list.width
+        spacing: Style.space(4)
+
+        Row {
+          spacing: Style.space(6)
+
+          StatusBadge {
+            anchors.verticalCenter: parent.verticalCenter
+            status: section.modelData.status
+            label: String(section.modelData.prs.length)
+            size: Style.font.caption
+            // Larger than the row dot, so a Section stands out from its PRs.
+            dotSize: Math.round(Style.font.caption * 0.8)
+          }
+
+          PanelSectionHeader {
+            anchors.verticalCenter: parent.verticalCenter
+            text: section.modelData.title
+            foreground: root.foreground
+          }
+        }
+
+        Repeater {
+          model: section.modelData.prs
+
+          delegate: Rectangle {
+            id: row
+            required property var modelData
+            width: section.width
+            height: rowContent.implicitHeight + Style.space(8)
+            radius: Style.space(4)
+            color: rowMouse.containsMouse ? Style.hoverFillFor(root.foreground) : "transparent"
+
+            Row {
+              id: rowContent
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.leftMargin: Style.space(4)
+              anchors.rightMargin: Style.space(4)
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(8)
+
+              StatusDot {
+                anchors.verticalCenter: parent.verticalCenter
+                status: row.modelData.status
+                size: Math.round(Style.font.caption * 0.5)
+              }
+
+              RowIcon {
+                visible: row.modelData.aiReviewDone
+                text: root.iconAiReview
+              }
+
+              RowIcon {
+                visible: row.modelData.approvalCount > 0
+                text: root.iconApproved + " " + row.modelData.approvalCount
+              }
+
+              RowIcon {
+                visible: text !== ""
+                text: root.reviewDecisionIcon(row.modelData.reviewDecision)
+              }
+
+              RowIcon {
+                visible: row.modelData.unresolvedThreadCount > 0
+                text: root.iconUnresolvedThreads + " " + row.modelData.unresolvedThreadCount
+              }
+
+              RowIcon {
+                visible: row.modelData.hasConflict
+                text: root.iconConflict
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: row.modelData.repo + "#" + row.modelData.number
+                textFormat: Text.PlainText
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                color: Commons.Color.muted
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: rowContent.width - x - (draftLabel.visible ? draftLabel.width + rowContent.spacing : 0)
+                text: row.modelData.title
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                color: root.foreground
+              }
+
+              Text {
+                id: draftLabel
+                anchors.verticalCenter: parent.verticalCenter
+                visible: row.modelData.isDraft
+                text: "draft"
+                textFormat: Text.PlainText
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.italic: true
+                color: Commons.Color.muted
+              }
+            }
+
+            MouseArea {
+              id: rowMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                Qt.openUrlExternally(row.modelData.url)
+                root.close()
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -372,158 +529,12 @@ Panel {
           panel: root
         }
 
-        Column {
+        PrList {
           id: prList
           visible: !root.settingsOpen
           width: scroller.pageWidth
-          spacing: Style.space(10)
-
-          Text {
-            visible: root.error !== ""
-            width: parent.width
-            text: root.error
-            textFormat: Text.PlainText
-            wrapMode: Text.Wrap
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            color: root.colorFor("failing")
-          }
-
-          Text {
-            visible: root.loaded && root.error === "" && root.prs.length === 0
-            text: "No open pull requests"
-            textFormat: Text.PlainText
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            color: Commons.Color.muted
-          }
-
-          Repeater {
-            model: root.error === "" ? root.prSections : []
-
-            delegate: Column {
-              id: section
-              required property var modelData
-              width: prList.width
-              spacing: Style.space(4)
-
-              Row {
-                spacing: Style.space(6)
-
-                StatusBadge {
-                  anchors.verticalCenter: parent.verticalCenter
-                  status: section.modelData.status
-                  label: String(section.modelData.prs.length)
-                  size: Style.font.caption
-                  // Larger than the row dot, so a Section stands out from its PRs.
-                  dotSize: Math.round(Style.font.caption * 0.8)
-                }
-
-                PanelSectionHeader {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: section.modelData.title
-                  foreground: root.foreground
-                }
-              }
-
-              Repeater {
-                model: section.modelData.prs
-
-                delegate: Rectangle {
-                  id: row
-                  required property var modelData
-                  width: section.width
-                  height: rowContent.implicitHeight + Style.space(8)
-                  radius: Style.space(4)
-                  color: rowMouse.containsMouse ? Style.hoverFillFor(root.foreground) : "transparent"
-
-                  Row {
-                    id: rowContent
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.leftMargin: Style.space(4)
-                    anchors.rightMargin: Style.space(4)
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Style.space(8)
-
-                    StatusDot {
-                      anchors.verticalCenter: parent.verticalCenter
-                      status: row.modelData.status
-                      size: Math.round(Style.font.caption * 0.5)
-                    }
-
-                    RowIcon {
-                      visible: row.modelData.aiReviewDone
-                      text: root.iconAiReview
-                    }
-
-                    RowIcon {
-                      visible: row.modelData.approvalCount > 0
-                      text: root.iconApproved + " " + row.modelData.approvalCount
-                    }
-
-                    RowIcon {
-                      visible: text !== ""
-                      text: root.reviewDecisionIcon(row.modelData.reviewDecision)
-                    }
-
-                    RowIcon {
-                      visible: row.modelData.unresolvedThreadCount > 0
-                      text: root.iconUnresolvedThreads + " " + row.modelData.unresolvedThreadCount
-                    }
-
-                    RowIcon {
-                      visible: row.modelData.hasConflict
-                      text: root.iconConflict
-                    }
-
-                    Text {
-                      anchors.verticalCenter: parent.verticalCenter
-                      text: row.modelData.repo + "#" + row.modelData.number
-                      textFormat: Text.PlainText
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.bodySmall
-                      color: Commons.Color.muted
-                    }
-
-                    Text {
-                      anchors.verticalCenter: parent.verticalCenter
-                      width: rowContent.width - x - (draftLabel.visible ? draftLabel.width + rowContent.spacing : 0)
-                      text: row.modelData.title
-                      textFormat: Text.PlainText
-                      elide: Text.ElideRight
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.body
-                      color: root.foreground
-                    }
-
-                    Text {
-                      id: draftLabel
-                      anchors.verticalCenter: parent.verticalCenter
-                      visible: row.modelData.isDraft
-                      text: "draft"
-                      textFormat: Text.PlainText
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      font.italic: true
-                      color: Commons.Color.muted
-                    }
-                  }
-
-                  MouseArea {
-                    id: rowMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                      Qt.openUrlExternally(row.modelData.url)
-                      root.close()
-                    }
-                  }
-                }
-              }
-            }
-          }
+          prs: root.prs
+          emptyText: "No open pull requests"
         }
       }
     }
