@@ -46,6 +46,7 @@ const prNode = (overrides) => Object.assign({
   url: 'https://github.com/acme/app/pull/7',
   isDraft: false,
   updatedAt: '2026-10-19T10:00:00Z',
+  author: { login: 'alice' },
   reviewDecision: 'APPROVED',
   reviewThreads: { nodes: [] },
   latestReviews: { nodes: [] },
@@ -69,6 +70,7 @@ describe('parseRun success', () => {
         url: 'https://github.com/acme/app/pull/7',
         isDraft: false,
         updatedAt: '2026-10-19T10:00:00Z',
+        author: 'alice',
         status: 'failing',
         aiReviewDone: false,
         reviewDecision: 'APPROVED',
@@ -345,6 +347,10 @@ describe('QUERY', () => {
     assert.match(P.QUERY, /\bmergeable\b/)
   })
 
+  it('reads the PR author', () => {
+    assert.match(P.QUERY, /PrFields on PullRequest \{[^}]*\bauthor \{ login \}/)
+  })
+
   it('reads the PR id and the viewer login', () => {
     assert.match(P.QUERY, /PullRequest \{ id\b/)
     assert.match(P.QUERY, /viewer \{ login \}/)
@@ -367,6 +373,10 @@ describe('parseRun PRs to review', () => {
     const result = P.parseRun(0, response([prNode()], [toReview]), '', '')
     assert.deepEqual(result.prs.map((pr) => pr.number), [7])
     assert.deepEqual(result.prsToReview.map((pr) => pr.number), [9])
+  })
+
+  it('names a deleted PR author ghost', () => {
+    assert.equal(P.parseRun(0, response([], [prNode({ author: null })]), '', '').prsToReview[0].author, 'ghost')
   })
 
   it('is empty when nothing waits for the viewer', () => {

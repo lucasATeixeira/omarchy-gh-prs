@@ -233,6 +233,7 @@ Panel {
 
     property var prs: []
     property string emptyText: ""
+    property bool showAuthor: false
     readonly property var prSections: Prs.sections(prs)
 
     spacing: Style.space(10)
@@ -338,7 +339,7 @@ Panel {
 
               Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: row.modelData.repo + "#" + row.modelData.number
+                text: row.modelData.repo + "#" + row.modelData.number + (list.showAuthor ? " @" + row.modelData.author : "")
                 textFormat: Text.PlainText
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.bodySmall
@@ -558,6 +559,7 @@ Panel {
           width: scroller.pageWidth
           prs: root.tab === "authored" ? root.prs : root.prsToReview
           emptyText: root.tab === "authored" ? "No open pull requests" : "No PRs to review"
+          showAuthor: root.tab === "toReview"
         }
       }
     }

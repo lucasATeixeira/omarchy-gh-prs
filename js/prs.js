@@ -37,6 +37,7 @@
  * @property {string} url
  * @property {boolean} isDraft
  * @property {string} updatedAt ISO 8601 timestamp.
+ * @property {string} author Login of who opened the PR.
  * @property {Status} status
  * @property {boolean} aiReviewDone
  * @property {?ReviewDecision} reviewDecision Null when the repo requires no review.
@@ -220,7 +221,7 @@ function sections(prs) {
 var QUERY = "query { viewer { login }"
     + " authored: search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } }"
     + " toReview: search(query: \"is:pr is:open review-requested:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } } }"
-    + " fragment PrFields on PullRequest { id number title url isDraft updatedAt reviewDecision mergeable repository { nameWithOwner }"
+    + " fragment PrFields on PullRequest { id number title url isDraft updatedAt author { login } reviewDecision mergeable repository { nameWithOwner }"
     + " reviewThreads(first: 100) { nodes { isResolved } }"
     + " latestReviews(first: 20) { nodes { id state author { login } } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
@@ -265,6 +266,7 @@ function toPullRequest(node, aiCheckPatterns) {
         url: node.url,
         isDraft: node.isDraft,
         updatedAt: node.updatedAt,
+        author: userLogin(node.author),
         status: prStatus(checks),
         aiReviewDone: aiReviewDone(checks, aiCheckPatterns),
         reviewDecision: node.reviewDecision,

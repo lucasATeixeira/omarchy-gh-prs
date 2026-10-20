@@ -4,7 +4,7 @@ An Omarchy bar widget that shows the CI status of your open GitHub pull requests
 
 The bar shows the GitHub icon with a badge: the worst CI status among your PRs and how many PRs have it. Red means a check failed, yellow means checks are still running, and green means every check passed. Click it to see your PRs grouped into Failing, Running, Passing, and No CI. Click a PR to open it in the browser.
 
-The popup has two tabs. **Authored** lists the PRs you opened. **To review** lists the open PRs that wait for your review, asked from you or from one of your teams. The badge and the notifications only count your authored PRs.
+The popup has two tabs. **Authored** lists the PRs you opened. **To review** lists the open PRs that wait for your review, asked from you or from one of your teams, and shows who opened each one. The badge and the notifications only count your authored PRs.
 
 When a PR's checks stop running and pass or fail, you get a notification. You also get one when a reviewer approves a PR or requests changes, when someone else writes new code comments, and when someone else merges or closes your PR. Click it to open the PR. Each notification can be turned off in Settings.
 
