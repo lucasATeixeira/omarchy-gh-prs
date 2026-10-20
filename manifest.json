@@ -25,6 +25,8 @@
       "notifyAiReviewDone": true,
       "notifyCiPassed": true,
       "notifyCiFailed": true,
+      "notifyApproved": true,
+      "notifyChangesRequested": true,
       "notifyMerged": true,
       "notifyClosed": true
     },
@@ -35,6 +37,8 @@
       { "key": "notifyAiReviewDone", "type": "boolean", "label": "Notify when the AI review is done" },
       { "key": "notifyCiPassed", "type": "boolean", "label": "Notify when CI passed" },
       { "key": "notifyCiFailed", "type": "boolean", "label": "Notify when CI failed" },
+      { "key": "notifyApproved", "type": "boolean", "label": "Notify when a PR is approved" },
+      { "key": "notifyChangesRequested", "type": "boolean", "label": "Notify when changes are requested" },
       { "key": "notifyMerged", "type": "boolean", "label": "Notify when a PR is merged" },
       { "key": "notifyClosed", "type": "boolean", "label": "Notify when a PR is closed" }
     ]

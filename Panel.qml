@@ -27,7 +27,10 @@ Panel {
   readonly property string iconClosed: "󰅙" // nf-md-close_circle
   readonly property var reviewDecisionIcons: ({ APPROVED: iconApproved, CHANGES_REQUESTED: iconChangesRequested })
   // A notification setting missing here uses the GitHub icon.
-  readonly property var notificationIcons: ({ notifyAiReviewDone: iconAiReview, notifyMerged: iconMerged, notifyClosed: iconClosed })
+  readonly property var notificationIcons: ({
+    notifyAiReviewDone: iconAiReview, notifyApproved: iconApproved, notifyChangesRequested: iconChangesRequested,
+    notifyMerged: iconMerged, notifyClosed: iconClosed
+  })
 
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground

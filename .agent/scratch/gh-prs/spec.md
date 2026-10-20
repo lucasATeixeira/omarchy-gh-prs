@@ -78,6 +78,17 @@ The widget tells the user when a PR's **CI finished**, so they do not need to wa
 - Same rules as the AI review notification: none on the first poll after a start, none for a PR seen for the first time, and a failed poll does not change the last seen PRs.
 - Drafts are included. Each notification can be turned off in Settings.
 
+## Review notification
+
+The widget tells the user when a reviewer approves a PR or requests changes. This works in every repo, also in repos that do not require reviews, because it reads `latestReviews` and not `reviewDecision`.
+
+- The main query reads each reviewer's latest Review: id, state, and author login. Its cost stays at 2 points.
+- A new Review is one whose id was not in the same PR's latest Reviews in the last successful poll.
+- Title `Approved by <login>` for `APPROVED`, `Changes requested by <login>` for `CHANGES_REQUESTED`. Body `owner/repo#123 — <PR title>`. Clicking it opens the PR.
+- `COMMENTED` and `DISMISSED` Reviews send nothing.
+- One notification per Review: two reviewers in the same poll give two notifications, and a second approval from the same reviewer after a new commit notifies again.
+- Same rules as the AI review notification: none on the first poll after a start, none for a PR seen for the first time, and drafts are included.
+
 ## Merged and closed notification
 
 - When a PR of the last successful poll is missing from the current one, the details query reads its state.
@@ -98,7 +109,7 @@ Icons on each row show if a PR is ready to merge. They do not change Status, Sec
   - `REVIEW_REQUIRED` or `null`: no icon.
 - Unresolved threads: `nf-md-comment_outline` followed by the number of review threads with `isResolved` false. Every thread counts: from any author, bots included, outdated included. Plain conversation comments are not counted, because they cannot be resolved. No icon when the count is 0.
 - Conflict: `nf-md-alert` when `mergeable` is `CONFLICTING`. `MERGEABLE` and `UNKNOWN` show no icon.
-- No notifications for review decision, threads, or conflicts.
+- The review decision icon does not notify; Review notifications come from `latestReviews`, see "Review notification". No notifications for threads or conflicts.
 
 ## Settings
 
@@ -134,10 +145,12 @@ A gear button in the popup lets the user change the widget's settings without ed
 | `notifyAiReviewDone` | `true` | Send `AI review done`. |
 | `notifyCiPassed` | `true` | Send `CI passed`. |
 | `notifyCiFailed` | `true` | Send `CI failed`. |
+| `notifyApproved` | `true` | Send `Approved by <login>`. |
+| `notifyChangesRequested` | `true` | Send `Changes requested by <login>`. |
 | `notifyMerged` | `true` | Send `PR merged by <login>`. |
 | `notifyClosed` | `true` | Send `PR closed by <login>`. |
 
-- The other toggles sit under the master switch, indented. When the master switch is off, they are greyed out and cannot be changed, but keep their values.
+- The toggles sit under the master switch, indented. When the master switch is off, they are greyed out and cannot be changed, but keep their values.
 - Turning a notification off does not change how the last seen PRs are tracked, so turning it back on does not send old notifications.
 
 ### Manifest

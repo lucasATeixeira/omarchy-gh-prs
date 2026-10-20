@@ -4,7 +4,7 @@ An Omarchy bar widget that shows the CI status of your open GitHub pull requests
 
 The bar shows the GitHub icon with a badge: the worst CI status among your PRs and how many PRs have it. Red means a check failed, yellow means checks are still running, and green means every check passed. Click it to see every PR grouped into Failing, Running, Passing, and No CI. Click a PR to open it in the browser.
 
-When a PR's checks stop running and pass or fail, you get a notification. You also get one when someone else merges or closes your PR. Click it to open the PR. Each notification can be turned off in Settings.
+When a PR's checks stop running and pass or fail, you get a notification. You also get one when a reviewer approves a PR or requests changes, and when someone else merges or closes your PR. Click it to open the PR. Each notification can be turned off in Settings.
 
 A PR's row shows a check icon when the PR is approved, and a document icon when changes are requested. A comment icon with a number shows how many review threads are still unresolved. An alert icon shows when the PR has merge conflicts.
 
@@ -37,6 +37,8 @@ Click the gear in the popup header to change the settings. Changes apply right a
 | `notifyAiReviewDone` | `true` | Notify when the AI review is done. |
 | `notifyCiPassed` | `true` | Notify when CI passed. |
 | `notifyCiFailed` | `true` | Notify when CI failed. |
+| `notifyApproved` | `true` | Notify when a PR is approved. |
+| `notifyChangesRequested` | `true` | Notify when changes are requested. |
 | `notifyMerged` | `true` | Notify when someone else merges your PR. |
 | `notifyClosed` | `true` | Notify when someone else closes your PR. |
 
