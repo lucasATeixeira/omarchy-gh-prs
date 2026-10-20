@@ -54,7 +54,9 @@ const prNode = (overrides) => Object.assign({
   commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [run('COMPLETED', 'FAILURE')] } } } }] }
 }, overrides)
 
-const response = (nodes) => JSON.stringify({ data: { viewer: { login: 'me' }, search: { nodes } } })
+const response = (nodes, toReviewNodes = []) => JSON.stringify({
+  data: { viewer: { login: 'me' }, authored: { nodes }, toReview: { nodes: toReviewNodes } }
+})
 
 describe('parseRun success', () => {
   it('turns search results into pull requests with their CI status', () => {
@@ -75,6 +77,7 @@ describe('parseRun success', () => {
         hasConflict: false,
         latestReviews: []
       }],
+      prsToReview: [],
       viewerLogin: 'me',
       error: ''
     })
@@ -354,7 +357,20 @@ describe('parseRun exit codes', () => {
   })
 
   it('drops the PR list and reports the error when gh fails', () => {
-    assert.deepEqual(P.parseRun(1, '', 'gh: Something went wrong\n'), { prs: [], error: 'gh: Something went wrong' })
+    assert.deepEqual(P.parseRun(1, '', 'gh: Something went wrong\n'), { prs: [], prsToReview: [], error: 'gh: Something went wrong' })
+  })
+})
+
+describe('parseRun PRs to review', () => {
+  it('reads Authored PRs and PRs to review from their own search', () => {
+    const toReview = prNode({ id: 'PR_9', number: 9, url: 'https://github.com/acme/app/pull/9' })
+    const result = P.parseRun(0, response([prNode()], [toReview]), '', '')
+    assert.deepEqual(result.prs.map((pr) => pr.number), [7])
+    assert.deepEqual(result.prsToReview.map((pr) => pr.number), [9])
+  })
+
+  it('is empty when nothing waits for the viewer', () => {
+    assert.deepEqual(P.parseRun(0, response([prNode()], []), '', '').prsToReview, [])
   })
 })
 

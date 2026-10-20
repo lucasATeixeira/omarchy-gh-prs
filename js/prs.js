@@ -49,7 +49,8 @@
 /**
  * The outcome of one fetch; `error` is empty on success.
  * @typedef {Object} FetchResult
- * @property {PullRequest[]} prs
+ * @property {PullRequest[]} prs The Authored PRs.
+ * @property {PullRequest[]} prsToReview
  * @property {string} [viewerLogin] The logged-in user; set on success.
  * @property {string} error
  */
@@ -215,13 +216,15 @@ function sections(prs) {
         .filter(function (section) { return section.prs.length > 0; });
 }
 
-/** GraphQL query for the user's 50 most recently updated open PRs and the fields each row shows. */
-var QUERY = "query { viewer { login } search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) {"
-    + " nodes { ... on PullRequest { id number title url isDraft updatedAt reviewDecision mergeable repository { nameWithOwner }"
+/** GraphQL query for the 50 most recently updated Authored PRs and PRs to review, with the fields each row shows. */
+var QUERY = "query { viewer { login }"
+    + " authored: search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } }"
+    + " toReview: search(query: \"is:pr is:open review-requested:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } } }"
+    + " fragment PrFields on PullRequest { id number title url isDraft updatedAt reviewDecision mergeable repository { nameWithOwner }"
     + " reviewThreads(first: 100) { nodes { isResolved } }"
     + " latestReviews(first: 20) { nodes { id state author { login } } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
-    + " __typename ... on CheckRun { name status conclusion } ... on StatusContext { context state } } } } } } } } } } }";
+    + " __typename ... on CheckRun { name status conclusion } ... on StatusContext { context state } } } } } } } }";
 
 /**
  * Turns one `gh api graphql` run with QUERY into the PRs to show, or an error.
@@ -232,17 +235,21 @@ var QUERY = "query { viewer { login } search(query: \"is:pr is:open author:@me s
  * @returns {FetchResult}
  */
 function parseRun(exitCode, stdout, stderr, aiCheckNames) {
-    if (exitCode !== 0) return { prs: [], error: errorMessage(stderr, exitCode) };
+    if (exitCode !== 0) return { prs: [], prsToReview: [], error: errorMessage(stderr, exitCode) };
     try {
         var patterns = aiCheckPatterns(aiCheckNames);
         var data = JSON.parse(stdout).data;
+        var toPullRequests = function (search) {
+            return search.nodes.map(function (node) { return toPullRequest(node, patterns); });
+        };
         return {
-            prs: data.search.nodes.map(function (node) { return toPullRequest(node, patterns); }),
+            prs: toPullRequests(data.authored),
+            prsToReview: toPullRequests(data.toReview),
             viewerLogin: data.viewer.login,
             error: ""
         };
     } catch (e) {
-        return { prs: [], error: "Unexpected response from gh" };
+        return { prs: [], prsToReview: [], error: "Unexpected response from gh" };
     }
 }
 

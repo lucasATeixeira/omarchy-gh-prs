@@ -61,7 +61,7 @@ The bar **Badge**, the **Bar summary**, and every notification stay about Author
   - `FetchResult` gets `prsToReview`, the PRs to review, next to `prs`, which stays the Authored PRs. Both are empty on error.
   - `sections` and `barSummary` do not change. The panel passes `prsToReview` through `sections`.
 - **The panel QML**:
-  - The PR list becomes one reusable component. It takes a list of PRs and an empty-state text, and it shows the Sections, the rows, the empty text, and the error. Each Tab uses one instance.
+  - The PR list becomes one reusable component. It takes a list of PRs and an empty-state text, and it shows the Sections, the rows, the empty text, and the error. One instance shows the PRs of the selected Tab.
   - The Tabs use the shell's existing `ButtonGroup`, under the header and above the separator. Titles: `Authored <n>` and `To review <n>`.
   - The selected Tab is a panel property. It starts on Authored and is not saved to settings.
   - The panel key catcher's move signal switches Tabs: right or `l` moves to To review, left or `h` moves to Authored. It is ignored while Settings is open.

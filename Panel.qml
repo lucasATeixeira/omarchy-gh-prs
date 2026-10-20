@@ -37,6 +37,7 @@ Panel {
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
 
   property var prs: []
+  property var prsToReview: []
   // PRs from the last successful poll; null until the first one.
   property var lastPrs: null
   // The successful main poll that waits for its details query.
@@ -45,6 +46,8 @@ Panel {
   property bool loaded: false
   property var colors: Prs.DEFAULT_COLORS
   property bool settingsOpen: false
+  // The selected Tab: "authored" or "toReview".
+  property string tab: "authored"
 
   readonly property string aiCheckNames: String(setting("aiCheckNames", "CodeRabbit"))
   readonly property int refreshIntervalSec: Prs.refreshIntervalSec(setting("refreshIntervalSec", 10))
@@ -53,6 +56,10 @@ Panel {
   // An error shows as a red mark instead of a count.
   readonly property string badgeStatus: error !== "" ? "failing" : summary.status
   readonly property string badgeLabel: error !== "" ? iconError : String(summary.count)
+  readonly property var tabOptions: [
+    { value: "authored", label: "Authored " + prs.length },
+    { value: "toReview", label: "To review " + prsToReview.length }
+  ]
 
   function colorFor(status) {
     return colors[status] || Commons.Color.muted
@@ -83,6 +90,11 @@ Panel {
     root.lastPrs = null
     root.pendingPoll = null
     refresh()
+  }
+
+  function selectTab(name) {
+    tab = name
+    scroller.contentY = 0
   }
 
   function openSettings() {
@@ -142,6 +154,7 @@ Panel {
         }
       }
       root.prs = result.prs
+      root.prsToReview = result.prsToReview
       root.error = result.error
       root.loaded = true
     }
@@ -496,6 +509,16 @@ Panel {
           }
         }
 
+        ButtonGroup {
+          visible: !root.settingsOpen
+          options: root.tabOptions
+          value: root.tab
+          focusable: false
+          foreground: root.foreground
+          fontFamily: root.fontFamily
+          onChanged: function(value) { root.selectTab(value) }
+        }
+
         PanelSeparator { width: parent.width }
       }
 
@@ -533,8 +556,8 @@ Panel {
           id: prList
           visible: !root.settingsOpen
           width: scroller.pageWidth
-          prs: root.prs
-          emptyText: "No open pull requests"
+          prs: root.tab === "authored" ? root.prs : root.prsToReview
+          emptyText: root.tab === "authored" ? "No open pull requests" : "No PRs to review"
         }
       }
     }

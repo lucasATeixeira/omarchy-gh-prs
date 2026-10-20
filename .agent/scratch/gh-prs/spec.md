@@ -9,7 +9,8 @@ An Omarchy shell bar widget that shows the CI status of the user's open GitHub p
 
 ## Data
 
-- The `gh` CLI runs one GraphQL query: open PRs the user authored, across all repos, drafts included, at most 50.
+- The `gh` CLI runs one GraphQL query with two searches, across all repos, drafts included, at most 50 each: the **Authored PRs** (`author:@me`) and the **PRs to review** (`review-requested:@me`, which includes the user's teams). Both read the same PR fields.
+- The Bar, the Badge, the notifications, and the details query use only the Authored PRs.
 - CI comes from the latest commit's `statusCheckRollup`. All **Checks** count, not only required ones.
 - The same query also reads each PR's `reviewDecision`, `mergeable`, and review threads' `isResolved`.
 - The same query also reads each PR's node `id` and the viewer's login. It costs 2 points, measured with `rateLimit(dryRun: true)`.
@@ -45,13 +46,15 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 
 - Max height: 60% of the screen height; below that it fits its content.
 - Header: "Pull Requests" plus the Bar summary as `● 1`. It stays fixed; only the Sections scroll.
+- Two **Tabs** under the header: `Authored <n>` and `To review <n>`. A click selects a Tab. The popup remembers the selected Tab while the shell runs and starts on Authored. The Tabs are hidden while Settings is open.
+- Both Tabs show their PRs in the same Sections and rows.
 - A thin scrollbar on the right appears only when the list overflows.
 - Sections, in order: Failing, Running, Passing, No CI. Empty Sections are hidden. Each Section header shows its dot (~8px, larger than the row dot) and PR count. Inside a Section, the most recently updated PR comes first.
 - Row: a small Status dot (~5px), `owner/repo#123`, the title elided with "…", and a "draft" label after the title when the PR is a draft. Clicking a row opens the PR in the browser and closes the popup.
 - Before the first fetch ends: no list and no empty message.
-- Zero PRs: "No open pull requests".
+- Zero PRs: "No open pull requests" on Authored, "No PRs to review" on To review.
 - Escape closes the popup, and Tab switches to the next bar panel, like the shell's own panels.
-- On error: only the error message. When the cause is auth, the message is "Not logged in to GitHub. Run: gh auth login". The error clears on the next successful poll.
+- On error: only the error message, on both Tabs. When the cause is auth, the message is "Not logged in to GitHub. Run: gh auth login". The error clears on the next successful poll.
 
 ## AI review
 
