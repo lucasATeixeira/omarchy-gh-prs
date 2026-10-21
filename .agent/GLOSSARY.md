@@ -12,9 +12,15 @@
 
 **AI Check**: a Check made by an AI code reviewer, such as CodeRabbit. A Check is an AI Check when its name matches an AI check pattern. An AI Check still counts toward its PR's Status like any other Check. _Avoid_: AI review, bot review.
 
-**AI check pattern**: a piece of text that the user chooses. Any Check whose name contains it, ignoring case, is an AI Check. For example, `rabbit` matches `CodeRabbit`. With no patterns, there are no AI Checks. _Avoid_: AI check name.
+**AI check pattern**: a piece of text that the user chooses. Any Check whose name contains it, ignoring case, is an AI Check. Any user whose login contains it, ignoring case, is an AI reviewer. For example, `rabbit` matches the Check `CodeRabbit` and the user `coderabbitai`. With no patterns, there are no AI Checks and no AI reviewers. _Avoid_: AI check name.
+
+**AI reviewer**: the GitHub user that an AI code reviewer posts as, such as `coderabbitai`. _Avoid_: AI bot, bot.
 
 **AI review done**: a PR whose latest commit has at least one AI Check, and every AI Check on it has finished, with any result. A new commit makes the PR not done again.
+
+**AI thread**: an Unresolved thread whose first comment is from an AI reviewer. _Avoid_: AI comment, AI suggestion.
+
+**AI changes suggested**: a PR whose AI review is done and that has at least one AI thread. The robot icon marks these PRs. _Avoid_: AI requested changes, AI review failed.
 
 **Status**: the CI state of a Check or a PR. One of `failing`, `running`, `passing`, or `none`. A PR's Status is the worst Status among its Checks; `none` means it has no Checks. _Avoid_: state, result, color.
 
