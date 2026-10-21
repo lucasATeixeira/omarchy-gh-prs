@@ -73,6 +73,7 @@ describe('parseRun success', () => {
         author: 'alice',
         status: 'failing',
         aiReviewDone: false,
+        aiChangesSuggested: false,
         reviewDecision: 'APPROVED',
         unresolvedThreadCount: 0,
         approvalCount: 0,
@@ -297,7 +298,7 @@ describe('parseRun approvals', () => {
   })
 })
 
-const thread = (isResolved) => ({ isResolved })
+const thread = (isResolved, author = 'ana') => ({ isResolved, comments: { nodes: [commentNode(author)] } })
 const unresolvedThreadCountFor = (threads) => P.parseRun(0, response([prNode({ reviewThreads: { nodes: threads } })]), '', '').prs[0].unresolvedThreadCount
 
 describe('parseRun unresolved threads', () => {
@@ -311,6 +312,51 @@ describe('parseRun unresolved threads', () => {
 
   it('counts only unresolved threads', () => {
     assert.equal(unresolvedThreadCountFor([thread(false), thread(true), thread(false)]), 2)
+  })
+})
+
+const aiReviewedNode = (threads, checks = [ctx('SUCCESS', 'CodeRabbit')]) => Object.assign(withChecks(checks), { reviewThreads: { nodes: threads } })
+const aiChangesSuggestedFor = (threads, aiCheckNames = 'CodeRabbit') =>
+  P.parseRun(0, response([aiReviewedNode(threads)]), '', aiCheckNames).prs[0].aiChangesSuggested
+
+describe('parseRun AI changes suggested', () => {
+  it('is true when the AI review is done and an AI thread is unresolved', () => {
+    assert.equal(aiChangesSuggestedFor([thread(true), thread(false, 'coderabbitai')]), true)
+  })
+
+  it('ignores resolved AI threads', () => {
+    assert.equal(aiChangesSuggestedFor([thread(true, 'coderabbitai')]), false)
+  })
+
+  it('ignores threads started by humans', () => {
+    assert.equal(aiChangesSuggestedFor([thread(false, 'ana'), thread(false, 'bob')]), false)
+  })
+
+  it('ignores an AI reply to a human thread', () => {
+    const humanThread = { isResolved: false, comments: { nodes: [commentNode('ana'), commentNode('coderabbitai')] } }
+    assert.equal(aiChangesSuggestedFor([humanThread]), false)
+  })
+
+  it('waits for the AI review to be done', () => {
+    const node = aiReviewedNode([thread(false, 'coderabbitai')], [ctx('PENDING', 'CodeRabbit')])
+    assert.equal(P.parseRun(0, response([node]), '', 'CodeRabbit').prs[0].aiChangesSuggested, false)
+  })
+
+  it('matches logins ignoring case', () => {
+    assert.equal(aiChangesSuggestedFor([thread(false, 'CodeRabbitAI')], 'coderabbit'), true)
+  })
+
+  it('is off without AI check patterns', () => {
+    assert.equal(aiChangesSuggestedFor([thread(false, 'coderabbitai')], ''), false)
+  })
+
+  it('ignores a thread started by a deleted account', () => {
+    assert.equal(aiChangesSuggestedFor([thread(false, null)]), false)
+  })
+
+  it('uses the same rule for PRs to review', () => {
+    const result = P.parseRun(0, response([], [aiReviewedNode([thread(false, 'coderabbitai')])]), '', 'CodeRabbit')
+    assert.equal(result.prsToReview[0].aiChangesSuggested, true)
   })
 })
 
@@ -337,6 +383,10 @@ describe('QUERY', () => {
 
   it('reads whether each review thread is resolved', () => {
     assert.match(P.QUERY, /reviewThreads\(first: 100\)[^}]*\bisResolved\b/)
+  })
+
+  it('reads who started each review thread', () => {
+    assert.match(P.QUERY, /reviewThreads\(first: 100\) \{ nodes \{ isResolved comments\(first: 1\) \{ nodes \{ author \{ login \} \} \} \} \}/)
   })
 
   it('reads each reviewer\'s latest review', () => {

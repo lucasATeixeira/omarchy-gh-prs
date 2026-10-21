@@ -322,7 +322,7 @@ Panel {
               }
 
               RowIcon {
-                visible: row.modelData.aiReviewDone
+                visible: row.modelData.aiChangesSuggested
                 text: root.iconAiReview
               }
 

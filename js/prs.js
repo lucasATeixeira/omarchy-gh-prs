@@ -40,6 +40,7 @@
  * @property {string} author Login of who opened the PR.
  * @property {Status} status
  * @property {boolean} aiReviewDone
+ * @property {boolean} aiChangesSuggested The AI review is done and an AI thread is unresolved.
  * @property {?ReviewDecision} reviewDecision Null when the repo requires no review.
  * @property {number} unresolvedThreadCount
  * @property {number} approvalCount Number of Approvals.
@@ -294,7 +295,7 @@ var QUERY = "query { viewer { login }"
     + " authoredPrs: search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } }"
     + " prsToReview: search(query: \"is:pr is:open review-requested:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } } }"
     + " fragment PrFields on PullRequest { id number title url isDraft updatedAt author { login } reviewDecision mergeable repository { nameWithOwner }"
-    + " reviewThreads(first: 100) { nodes { isResolved } }"
+    + " reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login } } } } }"
     + " latestReviews(first: 20) { nodes { id state author { login } } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
     + " __typename ... on CheckRun { name status conclusion } ... on StatusContext { context state } } } } } } } }";
@@ -330,6 +331,7 @@ function toPullRequest(node, aiCheckPatterns) {
     var rollup = node.commits.nodes[0].commit.statusCheckRollup;
     var checks = rollup ? rollup.contexts.nodes : [];
     var latestReviews = node.latestReviews.nodes.map(toReview);
+    var isAiReviewDone = aiReviewDone(checks, aiCheckPatterns);
     return {
         id: node.id,
         repo: node.repository.nameWithOwner,
@@ -340,13 +342,24 @@ function toPullRequest(node, aiCheckPatterns) {
         updatedAt: node.updatedAt,
         author: userLogin(node.author),
         status: prStatus(checks),
-        aiReviewDone: aiReviewDone(checks, aiCheckPatterns),
+        aiReviewDone: isAiReviewDone,
+        aiChangesSuggested: isAiReviewDone && node.reviewThreads.nodes.some(function (thread) { return isAiThread(thread, aiCheckPatterns); }),
         reviewDecision: node.reviewDecision,
         unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length,
         approvalCount: latestReviews.filter(isApproval).length,
         hasConflict: node.mergeable === "CONFLICTING",
         latestReviews: latestReviews
     };
+}
+
+/**
+ * Whether the thread is unresolved and an AI reviewer wrote its first comment.
+ * @param {{isResolved: boolean, comments: {nodes: {author: ?{login: string}}[]}}} thread Raw review thread node.
+ * @param {string[]} aiCheckPatterns Lowercase AI check patterns.
+ * @returns {boolean}
+ */
+function isAiThread(thread, aiCheckPatterns) {
+    return !thread.isResolved && matchesAiCheckPattern(userLogin(thread.comments.nodes[0].author), aiCheckPatterns);
 }
 
 function toReview(node) {
