@@ -4,7 +4,7 @@
 
 **Blocked by:** none.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `fetchProc.onExited` sets `prs`, `prsToReview`, `viewerLogin`, and `lastPollTime` only on success; on failure it sets only `error`.
 - [x] The Tab counts, the Sections, and the empty text depend on `lastPollTime > 0`, not on `error === ""`.

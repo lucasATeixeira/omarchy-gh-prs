@@ -4,7 +4,7 @@
 
 **Blocked by:** none. It touches the same file as 01, so do 01 first.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] A pure, documented function in `js/prs.js` turns the Last refresh and the current time into the label text, rounding down.
 - [x] Tests for it in `tests/prs.test.js` cover 0 s, 59 s, 60 s, 59 min 59 s, 60 min, 23 h 59 min, 24 h, and a few days.

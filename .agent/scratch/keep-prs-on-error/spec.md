@@ -1,6 +1,6 @@
 # Spec: Keep PRs on error and show the Last refresh
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
