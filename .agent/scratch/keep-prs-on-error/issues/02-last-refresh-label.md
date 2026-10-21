@@ -6,10 +6,10 @@
 
 **Status:** ready-for-agent
 
-- [ ] A pure, documented function in `js/prs.js` turns the Last refresh and the current time into the label text, rounding down.
-- [ ] Tests for it in `tests/prs.test.js` cover 0 s, 59 s, 60 s, 59 min 59 s, 60 min, 23 h 59 min, 24 h, and a few days.
-- [ ] A `now` property is set every 30 s while the popup is open, when it opens, and on each successful poll.
-- [ ] The label shows under the title in muted caption text when `lastPollTime > 0` and Settings is closed.
-- [ ] The main spec (`../../gh-prs/spec.md`) describes the label in the Popup header.
-- [ ] The README describes the label if it lists the popup contents.
+- [x] A pure, documented function in `js/prs.js` turns the Last refresh and the current time into the label text, rounding down.
+- [x] Tests for it in `tests/prs.test.js` cover 0 s, 59 s, 60 s, 59 min 59 s, 60 min, 23 h 59 min, 24 h, and a few days.
+- [x] A `now` property is set every 30 s while the popup is open, when it opens, and on each successful poll.
+- [x] The label shows under the title in muted caption text when `lastPollTime > 0` and Settings is closed.
+- [x] The main spec (`../../gh-prs/spec.md`) describes the label in the Popup header.
+- [x] The README describes the label if it lists the popup contents.
 - [ ] Hand check: the label says "just now" after a poll, counts up while polls fail, and resets after a success.

@@ -205,7 +205,8 @@ function barSummary(prs) {
     return { status: status, count: prs.filter(function (pr) { return pr.status === status; }).length };
 }
 
-var MS_PER_DAY = 24 * 60 * 60 * 1000;
+var MS_PER_MINUTE = 60 * 1000;
+var MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
 
 /**
  * The PRs that are not Stale: updated at most `maxAgeDays` × 24 hours before `now`.
@@ -217,6 +218,21 @@ var MS_PER_DAY = 24 * 60 * 60 * 1000;
 function withoutStalePrs(prs, maxAgeDays, now) {
     var oldestAllowed = now - maxAgeDays * MS_PER_DAY;
     return prs.filter(function (pr) { return Date.parse(pr.updatedAt) >= oldestAllowed; });
+}
+
+/**
+ * Says how long before `now` the Last refresh was, rounding down.
+ * @param {number} lastRefresh Milliseconds since the epoch.
+ * @param {number} now Milliseconds since the epoch.
+ * @returns {string}
+ */
+function refreshLabel(lastRefresh, now) {
+    var minutes = Math.floor((now - lastRefresh) / MS_PER_MINUTE);
+    if (minutes < 1) return "Refreshed just now";
+    if (minutes < 60) return "Refreshed " + minutes + " min ago";
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return "Refreshed " + hours + " h ago";
+    return "Refreshed " + Math.floor(hours / 24) + " d ago";
 }
 
 /**
@@ -822,6 +838,7 @@ if (typeof module !== "undefined") {
         removeAiCheckPattern: removeAiCheckPattern,
         barSummary: barSummary,
         withoutStalePrs: withoutStalePrs,
+        refreshLabel: refreshLabel,
         withoutMyApprovedPrs: withoutMyApprovedPrs,
         sections: sections,
         tabs: tabs,

@@ -41,6 +41,8 @@ Panel {
   property string viewerLogin: ""
   // Epoch milliseconds of the last successful poll; Stale PRs are measured from it.
   property real lastPollTime: 0
+  // Epoch milliseconds the Last refresh label counts up to.
+  property real now: 0
   // PRs from the last successful poll; null until the first one.
   property var lastPrs: null
   // The successful main poll that waits for its details query.
@@ -134,6 +136,7 @@ Panel {
   }
 
   onOpenedChanged: opened ? refresh() : closeSettings()
+  onLastPollTimeChanged: now = lastPollTime
 
   FileView {
     id: themeFile
@@ -187,6 +190,14 @@ Panel {
     repeat: true
     triggeredOnStart: true
     onTriggered: root.refresh()
+  }
+
+  Timer {
+    interval: 30 * 1000
+    running: root.opened
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: root.now = Date.now()
   }
 
   component StatusDot: Rectangle {
@@ -487,16 +498,28 @@ Panel {
           width: parent.width
           height: Math.max(headerTitle.implicitHeight, headerBadge.implicitHeight)
 
-          Text {
+          Column {
             id: headerTitle
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            text: root.settingsOpen ? "Settings" : "Pull Requests"
-            textFormat: Text.PlainText
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.title
-            font.bold: true
-            color: root.foreground
+
+            Text {
+              text: root.settingsOpen ? "Settings" : "Pull Requests"
+              textFormat: Text.PlainText
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.title
+              font.bold: true
+              color: root.foreground
+            }
+
+            Text {
+              visible: root.lastPollTime > 0 && !root.settingsOpen
+              text: Prs.refreshLabel(root.lastPollTime, root.now)
+              textFormat: Text.PlainText
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              color: Commons.Color.muted
+            }
           }
 
           Row {

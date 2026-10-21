@@ -938,3 +938,28 @@ describe('notificationEnabled activity toggles', () => {
     for (const key of keys) assert.equal(P.notificationEnabled({ notificationsEnabled: false, [key]: true }, key), false, key)
   })
 })
+
+describe('refreshLabel', () => {
+  const lastRefresh = Date.parse('2026-10-21T12:00:00Z')
+  const after = (sec) => P.refreshLabel(lastRefresh, lastRefresh + sec * 1000)
+
+  it('says just now under a minute', () => {
+    assert.equal(after(0), 'Refreshed just now')
+    assert.equal(after(59), 'Refreshed just now')
+  })
+
+  it('counts whole minutes under an hour', () => {
+    assert.equal(after(60), 'Refreshed 1 min ago')
+    assert.equal(after(59 * 60 + 59), 'Refreshed 59 min ago')
+  })
+
+  it('counts whole hours under a day', () => {
+    assert.equal(after(60 * 60), 'Refreshed 1 h ago')
+    assert.equal(after((23 * 60 + 59) * 60), 'Refreshed 23 h ago')
+  })
+
+  it('counts whole days from a day on', () => {
+    assert.equal(after(24 * 60 * 60), 'Refreshed 1 d ago')
+    assert.equal(after(3 * 24 * 60 * 60 + 5 * 60 * 60), 'Refreshed 3 d ago')
+  })
+})

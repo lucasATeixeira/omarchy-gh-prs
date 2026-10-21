@@ -47,6 +47,7 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 
 - Max height: 60% of the screen height; below that it fits its content.
 - Header: "Pull Requests" plus the Bar summary as `● 1`. It stays fixed; only the Sections scroll.
+- Under the title, a muted caption label says how long ago the **Last refresh** was, rounding down: "Refreshed just now" under 1 min, then "Refreshed N min ago", "Refreshed N h ago", and "Refreshed N d ago". It shows after the first successful poll, with or without an error, and is hidden while Settings is open. It updates every 30 s while the popup is open, when the popup opens, and on each successful poll.
 - Two **Tabs** under the header: `Authored <n>` and `To review <n>`. The counts are hidden before the first fetch ends and on error. A click selects a Tab. The popup remembers the selected Tab while the shell runs and starts on Authored. The Tabs are hidden while Settings is open.
 - Both Tabs show their PRs in the same Sections and rows. To review rows also show the author as `@login` in muted text after `owner/repo#123`.
 - A thin scrollbar on the right appears only when the list overflows.
