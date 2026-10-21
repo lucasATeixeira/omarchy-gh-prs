@@ -43,7 +43,7 @@ Panel {
   property real lastPollTime: 0
   // Epoch milliseconds the Last refresh label counts up to.
   property real now: 0
-  // PRs from the last successful poll; null until the first one.
+  // PRs the next poll's notifications compare against.
   property var lastPrs: null
   // The successful main poll that waits for its details query.
   property var pendingPoll: null
@@ -65,9 +65,8 @@ Panel {
   // An error shows as a red mark instead of a count.
   readonly property string badgeStatus: error !== "" ? "failing" : summary.status
   readonly property string badgeLabel: error !== "" ? iconError : String(summary.count)
-  // True once a poll has succeeded, so the popup has PRs to show.
-  readonly property bool hasData: lastPollTime > 0
-  readonly property var tabs: Prs.tabs(freshPrs, shownPrsToReview, hasData)
+  readonly property bool hasLastRefresh: lastPollTime > 0
+  readonly property var tabs: Prs.tabs(freshPrs, shownPrsToReview, hasLastRefresh)
   readonly property var currentTab: tabs[tabIndex]
 
   function colorFor(status) {
@@ -271,7 +270,7 @@ Panel {
     }
 
     Text {
-      visible: root.hasData && list.prs.length === 0
+      visible: root.hasLastRefresh && list.prs.length === 0
       text: list.emptyText
       textFormat: Text.PlainText
       font.family: root.fontFamily
@@ -497,10 +496,10 @@ Panel {
 
         Item {
           width: parent.width
-          height: Math.max(headerTitle.implicitHeight, headerBadge.implicitHeight)
+          height: Math.max(headerText.implicitHeight, headerBadge.implicitHeight)
 
           Column {
-            id: headerTitle
+            id: headerText
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
 
@@ -514,7 +513,7 @@ Panel {
             }
 
             Text {
-              visible: root.hasData && !root.settingsOpen
+              visible: root.hasLastRefresh && !root.settingsOpen
               text: Prs.refreshLabel(root.lastPollTime, root.now)
               textFormat: Text.PlainText
               font.family: root.fontFamily
