@@ -66,7 +66,10 @@ Some repos run an AI code reviewer in CI, such as CodeRabbit. The widget tells t
 - Setting `aiCheckNames`: a comma-separated string of **AI check patterns**, default `"CodeRabbit"`. A Check is an **AI Check** when its name contains one of the patterns, ignoring case. The name is `context` for a commit status and `name` for a check run.
 - **AI review done**: the latest commit has at least one AI Check, and every AI Check on it has finished, with any result. A new commit makes the PR not done again.
 - Status rules, Sections, and the Badge do not change. An AI Check counts toward the PR's Status like any other Check.
-- Row: a robot icon to the right of the Status dot when the AI review is done. Always in the normal text color. PRs without AI Checks look as before.
+- **AI reviewer**: a user whose login contains an AI check pattern, ignoring case. A deleted account is the login `ghost`.
+- **AI thread**: an Unresolved thread whose first comment is from an AI reviewer. Threads where the AI only replied do not count.
+- **AI changes suggested**: the AI review is done and the PR has at least one AI thread.
+- Row: a robot icon to the right of the Status dot when the PR has AI changes suggested, with no count. Always in the normal text color. The same rule applies on both Tabs. A PR whose AI review found nothing shows no robot.
 - Notification: when a PR was seen in the last successful poll as not done and is done now. Title `AI review done`, body `owner/repo#123 — <PR title>`. Clicking it opens the PR.
 - No notification on the first poll after a start, or for a PR seen for the first time.
 - A failed poll does not change the last seen PRs.
