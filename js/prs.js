@@ -493,7 +493,8 @@ function toPrDetails(node) {
  */
 function pollNotifications(previousPrs, currentPrs, details, viewerLogin) {
     var aiReviews = finishedAiReviews(previousPrs, currentPrs).map(function (pr) {
-        return { setting: "notifyAiReviewDone", title: "AI review done", pr: pr };
+        var title = pr.aiChangesSuggested ? "AI review: changes suggested" : "AI review: no changes suggested";
+        return { setting: "notifyAiReviewDone", title: title, pr: pr };
     });
     var ci = finishedCi(previousPrs, currentPrs).map(function (pr) {
         return { setting: ciNotificationSetting(pr.status), title: ciNotificationTitle(pr.status), pr: pr };

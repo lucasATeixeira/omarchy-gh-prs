@@ -664,13 +664,23 @@ describe('notificationEnabled', () => {
   })
 })
 
-const polled = (number, status, aiReviewDone) => Object.assign(pr(status, undefined, number), { url: 'u' + number, aiReviewDone, latestReviews: [] })
+const polled = (number, status, aiReviewDone, aiChangesSuggested = false) =>
+  Object.assign(pr(status, undefined, number), { url: 'u' + number, aiReviewDone, aiChangesSuggested, latestReviews: [] })
 const sent = (notifications) => notifications.map(n => [n.setting, n.title, n.pr.number])
 
 describe('pollNotifications', () => {
-  it('notifies when the AI review is done', () => {
+  it('notifies AI changes suggested when the AI review is done with AI threads', () => {
+    const notifications = P.pollNotifications([polled(1, 'none', false)], [polled(1, 'none', true, true)], null, 'me')
+    assert.deepEqual(sent(notifications), [['notifyAiReviewDone', 'AI review: changes suggested', 1]])
+  })
+
+  it('notifies no AI changes suggested when the AI review is done without AI threads', () => {
     const notifications = P.pollNotifications([polled(1, 'none', false)], [polled(1, 'none', true)], null, 'me')
-    assert.deepEqual(sent(notifications), [['notifyAiReviewDone', 'AI review done', 1]])
+    assert.deepEqual(sent(notifications), [['notifyAiReviewDone', 'AI review: no changes suggested', 1]])
+  })
+
+  it('sends nothing when AI changes are suggested after the AI review was done', () => {
+    assert.deepEqual(P.pollNotifications([polled(1, 'none', true)], [polled(1, 'none', true, true)], null, 'me'), [])
   })
 
   it('notifies when CI passed or failed', () => {
@@ -684,7 +694,10 @@ describe('pollNotifications', () => {
 
   it('sends both when the AI review and CI finish in the same poll', () => {
     const notifications = P.pollNotifications([polled(1, 'running', false)], [polled(1, 'passing', true)], null, 'me')
-    assert.deepEqual(sent(notifications), [['notifyAiReviewDone', 'AI review done', 1], ['notifyCiPassed', 'CI passed', 1]])
+    assert.deepEqual(sent(notifications), [
+      ['notifyAiReviewDone', 'AI review: no changes suggested', 1],
+      ['notifyCiPassed', 'CI passed', 1]
+    ])
   })
 
   it('sends nothing on the first poll', () => {
