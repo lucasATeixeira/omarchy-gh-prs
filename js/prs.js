@@ -145,16 +145,24 @@ function aiCheckPatterns(aiCheckNames) {
 }
 
 /**
+ * Whether the name contains any AI check pattern, ignoring case.
+ * @param {string} name
+ * @param {string[]} patterns Lowercase AI check patterns.
+ * @returns {boolean}
+ */
+function matchesAiCheckPattern(name, patterns) {
+    var lowerName = name.toLowerCase();
+    return patterns.some(function (pattern) { return lowerName.indexOf(pattern) !== -1; });
+}
+
+/**
  * Whether the checks include an AI Check and every AI Check has finished.
  * @param {CheckContext[]} checks
- * @param {string[]} patterns Lowercase substrings of an AI Check's name.
+ * @param {string[]} patterns Lowercase AI check patterns.
  * @returns {boolean}
  */
 function aiReviewDone(checks, patterns) {
-    var aiChecks = checks.filter(function (check) {
-        var name = checkName(check).toLowerCase();
-        return patterns.some(function (pattern) { return name.indexOf(pattern) !== -1; });
-    });
+    var aiChecks = checks.filter(function (check) { return matchesAiCheckPattern(checkName(check), patterns); });
     return aiChecks.length > 0 && aiChecks.every(function (check) { return checkStatus(check) !== "running"; });
 }
 
