@@ -6,6 +6,8 @@
 
 **Stale PR**: a PR whose last update is older than the max age the user chose for its Tab. The popup and the Badge hide Stale PRs, but they still send notifications. _Avoid_: old PR, expired PR.
 
+**Last refresh**: the time of the last successful poll. The popup shows how long ago it was. A failed poll does not change it, and the popup keeps the PRs from the Last refresh. _Avoid_: last update, last fetch.
+
 **Tab**: one of the two lists in the popup: Authored, with the Authored PRs, and To review, with the PRs to review. _Avoid_: page, view.
 
 **Check**: one CI result on a PR's latest commit. In the GitHub API it is a `CheckRun` (GitHub Actions and apps) or a `StatusContext` (commit statuses). _Avoid_: job, build.
