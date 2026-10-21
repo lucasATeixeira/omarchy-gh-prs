@@ -203,7 +203,7 @@ function withoutStalePrs(prs, maxAgeDays, now) {
     return prs.filter(function (pr) { return Date.parse(pr.updatedAt) >= oldestAllowed; });
 }
 
-var SECTION_TITLES ={ failing: "Failing", running: "Running", passing: "Passing", none: "No CI" };
+var SECTION_TITLES = { failing: "Failing", running: "Running", passing: "Passing", none: "No CI" };
 
 /**
  * One titled group of PRs in the panel.
@@ -669,6 +669,21 @@ function themeColors(toml) {
  *     |"notifyCodeComments"|"notifyMerged"|"notifyClosed"} NotificationSetting
  */
 
+/**
+ * `value` rounded to a whole number within `min` and `max`; `fallback` when it is not a number.
+ * @param {unknown} value
+ * @param {number} min
+ * @param {number} max
+ * @param {number} fallback
+ * @returns {number}
+ */
+function wholeNumberInRange(value, min, max, fallback) {
+    // Number(null) and Number("") are 0, so they would pass as a number.
+    var number = value === null || value === "" ? NaN : Math.round(Number(value));
+    if (!isFinite(number)) return fallback;
+    return Math.min(max, Math.max(min, number));
+}
+
 var REFRESH_INTERVAL_MIN_SEC = 5;
 var REFRESH_INTERVAL_MAX_SEC = 3600;
 var REFRESH_INTERVAL_DEFAULT_SEC = 10;
@@ -679,9 +694,7 @@ var REFRESH_INTERVAL_DEFAULT_SEC = 10;
  * @returns {number}
  */
 function refreshIntervalSec(value) {
-    var seconds = Math.round(Number(value));
-    if (!isFinite(seconds)) return REFRESH_INTERVAL_DEFAULT_SEC;
-    return Math.min(REFRESH_INTERVAL_MAX_SEC, Math.max(REFRESH_INTERVAL_MIN_SEC, seconds));
+    return wholeNumberInRange(value, REFRESH_INTERVAL_MIN_SEC, REFRESH_INTERVAL_MAX_SEC, REFRESH_INTERVAL_DEFAULT_SEC);
 }
 
 var MAX_AGE_MIN_DAYS = 1;
@@ -694,9 +707,7 @@ var MAX_AGE_DEFAULT_DAYS = 365;
  * @returns {number}
  */
 function maxAgeDays(value) {
-    var days = Math.round(Number(value));
-    if (!isFinite(days)) return MAX_AGE_DEFAULT_DAYS;
-    return Math.min(MAX_AGE_MAX_DAYS, Math.max(MAX_AGE_MIN_DAYS, days));
+    return wholeNumberInRange(value, MAX_AGE_MIN_DAYS, MAX_AGE_MAX_DAYS, MAX_AGE_DEFAULT_DAYS);
 }
 
 /**

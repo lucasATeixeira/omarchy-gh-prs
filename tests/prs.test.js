@@ -427,6 +427,11 @@ describe('refreshIntervalSec', () => {
     assert.equal(P.refreshIntervalSec('soon'), 10)
     assert.equal(P.refreshIntervalSec(undefined), 10)
   })
+
+  it('falls back to the default for null and an empty string', () => {
+    assert.equal(P.refreshIntervalSec(null), 10)
+    assert.equal(P.refreshIntervalSec(''), 10)
+  })
 })
 
 describe('withoutStalePrs', () => {
@@ -441,7 +446,7 @@ describe('withoutStalePrs', () => {
     assert.deepEqual(P.withoutStalePrs([pr('failing', '2026-10-01T12:00:00Z')], 7, now), [])
   })
 
-  it('keeps a PR exactly at the limit and hides one a millisecond older', () => {
+  it('treats the limit as inclusive', () => {
     const atLimit = pr('passing', '2026-10-14T12:00:00.000Z', 1)
     const pastLimit = pr('passing', '2026-10-14T11:59:59.999Z', 2)
     assert.deepEqual(P.withoutStalePrs([atLimit, pastLimit], 7, now), [atLimit])
@@ -473,6 +478,11 @@ describe('maxAgeDays', () => {
   it('falls back to the default for a value that is not a number', () => {
     assert.equal(P.maxAgeDays('forever'), 365)
     assert.equal(P.maxAgeDays(undefined), 365)
+  })
+
+  it('falls back to the default for null and an empty string', () => {
+    assert.equal(P.maxAgeDays(null), 365)
+    assert.equal(P.maxAgeDays(''), 365)
   })
 })
 

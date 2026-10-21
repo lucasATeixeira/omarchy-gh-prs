@@ -148,7 +148,7 @@ A gear button in the popup lets the user change the widget's settings without ed
 - `authoredMaxAgeDays`: a whole number of days, from 1 to 365, default 365. Label: "Authored: max days since last update".
 - `toReviewMaxAgeDays`: the same, for the To review Tab. Label: "To review: max days since last update".
 - Each is a number field with up and down arrows that step by 1. A typed value outside the range is clamped to the nearest limit; a value in `shell.json` that is not a number counts as 365.
-- The Tabs and the Badge use the new values right away, measured from the last successful poll.
+- The Tabs and the Badge use the new values right away, measured from the last successful poll. A PR that becomes Stale between polls stays visible until the next poll.
 
 ### AI checks
 
