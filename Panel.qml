@@ -46,7 +46,6 @@ Panel {
   // The successful main poll that waits for its details query.
   property var pendingPoll: null
   property string error: ""
-  property bool loaded: false
   property var colors: Prs.DEFAULT_COLORS
   property bool settingsOpen: false
   property int tabIndex: 0
@@ -64,7 +63,9 @@ Panel {
   // An error shows as a red mark instead of a count.
   readonly property string badgeStatus: error !== "" ? "failing" : summary.status
   readonly property string badgeLabel: error !== "" ? iconError : String(summary.count)
-  readonly property var tabs: Prs.tabs(freshPrs, shownPrsToReview, loaded && error === "")
+  // True once a poll has succeeded, so the popup has PRs to show.
+  readonly property bool hasData: lastPollTime > 0
+  readonly property var tabs: Prs.tabs(freshPrs, shownPrsToReview, hasData)
   readonly property var currentTab: tabs[tabIndex]
 
   function colorFor(status) {
@@ -150,8 +151,11 @@ Panel {
     onExited: function(exitCode) {
       var result = Prs.parseRun(exitCode, String(fetchStdout.text), String(fetchStderr.text),
                                 root.aiCheckNames)
+      // A failed poll keeps the PRs from the Last refresh.
       if (result.error === "") {
         root.lastPollTime = Date.now()
+        root.prs = result.prs
+        root.prsToReview = result.prsToReview
         root.viewerLogin = result.viewerLogin
         var ids = Prs.prIdsNeedingDetails(root.lastPrs, result.prs)
         if (ids.length > 0) {
@@ -162,10 +166,7 @@ Panel {
           root.finishPoll(result, null)
         }
       }
-      root.prs = result.prs
-      root.prsToReview = result.prsToReview
       root.error = result.error
-      root.loaded = true
     }
   }
 
@@ -259,7 +260,7 @@ Panel {
     }
 
     Text {
-      visible: root.loaded && root.error === "" && list.prs.length === 0
+      visible: root.hasData && list.prs.length === 0
       text: list.emptyText
       textFormat: Text.PlainText
       font.family: root.fontFamily
@@ -268,7 +269,7 @@ Panel {
     }
 
     Repeater {
-      model: root.error === "" ? list.prSections : []
+      model: list.prSections
 
       delegate: Column {
         id: section

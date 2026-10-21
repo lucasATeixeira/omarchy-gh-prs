@@ -450,7 +450,7 @@ describe('tabs', () => {
     ])
   })
 
-  it('hides the counts when the lists are not fresh', () => {
+  it('hides the counts before the first successful poll', () => {
     assert.deepEqual(P.tabs([], [], false).map((tab) => tab.label), ['Authored', 'To review'])
   })
 })
