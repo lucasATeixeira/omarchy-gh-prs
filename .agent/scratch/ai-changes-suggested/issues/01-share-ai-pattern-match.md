@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] One function matches a name against the lowercase AI check patterns.
-- [ ] The AI Check filter uses it.
-- [ ] Every existing test passes with no test changed or removed.
+- [x] One function matches a name against the lowercase AI check patterns.
+- [x] The AI Check filter uses it.
+- [x] Every existing test passes with no test changed or removed.

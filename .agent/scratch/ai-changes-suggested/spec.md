@@ -1,6 +1,6 @@
 # Spec: Robot icon only for AI changes suggested
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

@@ -4,10 +4,10 @@
 
 **Blocked by:** 02 (Robot icon only for AI changes suggested).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Done with AI changes suggested sends "AI review: changes suggested" with setting `notifyAiReviewDone`.
-- [ ] Done without them sends "AI review: no changes suggested" with setting `notifyAiReviewDone`.
-- [ ] `aiChangesSuggested` turning true while the AI review was already done sends no AI notification.
-- [ ] `pollNotifications` tests cover these three cases.
-- [ ] The main spec and the README describe the two titles. Keep the README's other uncommitted changes.
+- [x] Done with AI changes suggested sends "AI review: changes suggested" with setting `notifyAiReviewDone`.
+- [x] Done without them sends "AI review: no changes suggested" with setting `notifyAiReviewDone`.
+- [x] `aiChangesSuggested` turning true while the AI review was already done sends no AI notification.
+- [x] `pollNotifications` tests cover these three cases.
+- [x] The main spec and the README describe the two titles. Keep the README's other uncommitted changes.

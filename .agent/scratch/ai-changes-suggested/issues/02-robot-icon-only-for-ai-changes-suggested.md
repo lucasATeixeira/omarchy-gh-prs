@@ -4,15 +4,15 @@
 
 **Blocked by:** 01 (Share the AI pattern match).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The main query reads the author login of each review thread's first comment.
-- [ ] Each PR has an `aiChangesSuggested` field, true only when the AI review is done and at least one AI thread exists.
-- [ ] AI reviewers are found with the shared pattern match from 01.
-- [ ] Resolved AI threads, threads started by humans, and threads whose first author is a deleted account do not count.
-- [ ] No AI check patterns means `aiChangesSuggested` is always false.
-- [ ] The robot icon shows when `aiChangesSuggested` is true, with no count.
-- [ ] `parseRun` tests cover every case listed in the spec, for Authored PRs and PRs to review.
-- [ ] The `QUERY` test asserts the new thread author field.
-- [ ] The main spec and the README describe the new robot rule. Keep the README's other uncommitted changes.
+- [x] The main query reads the author login of each review thread's first comment.
+- [x] Each PR has an `aiChangesSuggested` field, true only when the AI review is done and at least one AI thread exists.
+- [x] AI reviewers are found with the shared pattern match from 01.
+- [x] Resolved AI threads, threads started by humans, and threads whose first author is a deleted account do not count.
+- [x] No AI check patterns means `aiChangesSuggested` is always false.
+- [x] The robot icon shows when `aiChangesSuggested` is true, with no count.
+- [x] `parseRun` tests cover every case listed in the spec, for Authored PRs and PRs to review.
+- [x] The `QUERY` test asserts the new thread author field.
+- [x] The main spec and the README describe the new robot rule. Keep the README's other uncommitted changes.
 - [ ] Hand check: a PR with a clean AI review shows no robot; a PR with an unresolved AI thread shows it.
