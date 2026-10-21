@@ -21,6 +21,7 @@
     "defaults": {
       "refreshIntervalSec": 10,
       "authoredMaxAgeDays": 365,
+      "toReviewMaxAgeDays": 365,
       "aiCheckNames": "CodeRabbit",
       "notificationsEnabled": true,
       "notifyAiReviewDone": true,
@@ -35,6 +36,7 @@
     "schema": [
       { "key": "refreshIntervalSec", "type": "integer", "label": "Refresh interval (seconds)", "min": 5, "max": 3600, "step": 5 },
       { "key": "authoredMaxAgeDays", "type": "integer", "label": "Authored: max days since last update", "min": 1, "max": 365, "step": 1 },
+      { "key": "toReviewMaxAgeDays", "type": "integer", "label": "To review: max days since last update", "min": 1, "max": 365, "step": 1 },
       { "key": "aiCheckNames", "type": "string", "label": "AI check patterns (comma-separated)" },
       { "key": "notificationsEnabled", "type": "boolean", "label": "All notifications" },
       { "key": "notifyAiReviewDone", "type": "boolean", "label": "Notify when the AI review is done" },

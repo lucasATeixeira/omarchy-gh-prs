@@ -69,6 +69,17 @@ FocusScope {
         fontFamily: root.panel.fontFamily
         onModified: function(value) { root.panel.saveSettings({ authoredMaxAgeDays: value }) }
       }
+
+      NumberField {
+        label: "To review: max days since last update"
+        from: Prs.MAX_AGE_MIN_DAYS
+        to: Prs.MAX_AGE_MAX_DAYS
+        stepSize: 1
+        value: root.panel.toReviewMaxAgeDays
+        foreground: root.panel.foreground
+        fontFamily: root.panel.fontFamily
+        onModified: function(value) { root.panel.saveSettings({ toReviewMaxAgeDays: value }) }
+      }
     }
 
     Column {

@@ -11,7 +11,7 @@ An Omarchy shell bar widget that shows the CI status of the user's open GitHub p
 
 - The `gh` CLI runs one GraphQL query with two searches, across all repos, drafts included, at most 50 each: the **Authored PRs** (`author:@me`) and the **PRs to review** (`review-requested:@me`, which includes the user's teams). Both read the same PR fields.
 - The Bar, the Badge, the notifications, and the details query use only the Authored PRs.
-- **Stale PRs**: an Authored PR whose `updatedAt` is more than `authoredMaxAgeDays` × 24 hours before the last successful poll is Stale. A PR exactly at the limit is not Stale. The widget filters after the fetch, so the searches still return at most 50 PRs each. The popup and the Badge hide Stale PRs; the notifications, the details query, and the last seen PRs use every Authored PR.
+- **Stale PRs**: a PR whose `updatedAt` is more than its Tab's max age (`authoredMaxAgeDays` or `toReviewMaxAgeDays`) × 24 hours before the last successful poll is Stale. A PR exactly at the limit is not Stale. The widget filters after the fetch, so the searches still return at most 50 PRs each. The popup and the Badge hide Stale PRs; the notifications, the details query, and the last seen PRs use every Authored PR.
 - CI comes from the latest commit's `statusCheckRollup`. All **Checks** count, not only required ones.
 - The same query also reads each PR's `reviewDecision`, `mergeable`, and review threads' `isResolved`.
 - The same query also reads each PR's node `id` and the viewer's login. It costs 2 points, measured with `rateLimit(dryRun: true)`.
@@ -53,7 +53,7 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 - Sections, in order: Failing, Running, Passing, No CI. Empty Sections are hidden. Each Section header shows its dot (~8px, larger than the row dot) and PR count. Inside a Section, the most recently updated PR comes first.
 - Row: a small Status dot (~5px), `owner/repo#123`, the title elided with "…", and a "draft" label after the title when the PR is a draft. Clicking a row opens the PR in the browser and closes the popup.
 - Before the first fetch ends: no list and no empty message.
-- The Authored Tab, its count, and the header's Bar summary skip Stale PRs. No hint shows that PRs are hidden.
+- Both Tabs, their counts, and the header's Bar summary skip Stale PRs. No hint shows that PRs are hidden.
 - Zero PRs, or every PR Stale: "No open pull requests" on Authored, "No PRs to review" on To review.
 - Escape closes the popup, and Tab switches to the next bar panel, like the shell's own panels.
 - `h` or Left selects Authored, and `l` or Right selects To review. These keys do nothing while Settings is open.
@@ -146,8 +146,9 @@ A gear button in the popup lets the user change the widget's settings without ed
 ### Hide stale PRs
 
 - `authoredMaxAgeDays`: a whole number of days, from 1 to 365, default 365. Label: "Authored: max days since last update".
-- A number field with up and down arrows that step by 1. A typed value outside the range is clamped to the nearest limit; a value in `shell.json` that is not a number counts as 365.
-- The Authored Tab and the Badge use the new value right away, measured from the last successful poll.
+- `toReviewMaxAgeDays`: the same, for the To review Tab. Label: "To review: max days since last update".
+- Each is a number field with up and down arrows that step by 1. A typed value outside the range is clamped to the nearest limit; a value in `shell.json` that is not a number counts as 365.
+- The Tabs and the Badge use the new values right away, measured from the last successful poll.
 
 ### AI checks
 
@@ -177,7 +178,7 @@ A gear button in the popup lets the user change the widget's settings without ed
 
 ### Manifest
 
-- `defaults` and `schema` list every key above, so they can still be edited by hand. `refreshIntervalSec` is an `integer` with `min: 5` and `max: 3600`; `authoredMaxAgeDays` is an `integer` with `min: 1`, `max: 365`, and `step: 1`; the notification keys are `boolean`.
+- `defaults` and `schema` list every key above, so they can still be edited by hand. `refreshIntervalSec` is an `integer` with `min: 5` and `max: 3600`; `authoredMaxAgeDays` and `toReviewMaxAgeDays` are `integer`s with `min: 1`, `max: 365`, and `step: 1`; the notification keys are `boolean`.
 
 ## Tests
 

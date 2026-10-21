@@ -53,13 +53,15 @@ Panel {
   readonly property string aiCheckNames: String(setting("aiCheckNames", "CodeRabbit"))
   readonly property int refreshIntervalSec: Prs.refreshIntervalSec(setting("refreshIntervalSec", 10))
   readonly property int authoredMaxAgeDays: Prs.maxAgeDays(setting("authoredMaxAgeDays", Prs.MAX_AGE_DEFAULT_DAYS))
+  readonly property int toReviewMaxAgeDays: Prs.maxAgeDays(setting("toReviewMaxAgeDays", Prs.MAX_AGE_DEFAULT_DAYS))
 
   readonly property var freshPrs: Prs.withoutStalePrs(prs, authoredMaxAgeDays, lastPollTime)
+  readonly property var freshPrsToReview: Prs.withoutStalePrs(prsToReview, toReviewMaxAgeDays, lastPollTime)
   readonly property var summary: Prs.barSummary(freshPrs)
   // An error shows as a red mark instead of a count.
   readonly property string badgeStatus: error !== "" ? "failing" : summary.status
   readonly property string badgeLabel: error !== "" ? iconError : String(summary.count)
-  readonly property var tabs: Prs.tabs(freshPrs, prsToReview, loaded && error === "")
+  readonly property var tabs: Prs.tabs(freshPrs, freshPrsToReview, loaded && error === "")
   readonly property var currentTab: tabs[tabIndex]
 
   function colorFor(status) {

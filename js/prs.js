@@ -651,6 +651,7 @@ function themeColors(toml) {
  * @typedef {Object} WidgetSettings
  * @property {number} [refreshIntervalSec]
  * @property {number} [authoredMaxAgeDays]
+ * @property {number} [toReviewMaxAgeDays]
  * @property {string} [aiCheckNames]
  * @property {boolean} [notificationsEnabled]
  * @property {boolean} [notifyAiReviewDone]
