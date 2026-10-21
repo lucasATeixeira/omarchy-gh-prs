@@ -38,6 +38,7 @@ Panel {
 
   property var prs: []
   property var prsToReview: []
+  property string viewerLogin: ""
   // Epoch milliseconds of the last successful poll; Stale PRs are measured from it.
   property real lastPollTime: 0
   // PRs from the last successful poll; null until the first one.
@@ -57,11 +58,13 @@ Panel {
 
   readonly property var freshPrs: Prs.withoutStalePrs(prs, authoredMaxAgeDays, lastPollTime)
   readonly property var freshPrsToReview: Prs.withoutStalePrs(prsToReview, toReviewMaxAgeDays, lastPollTime)
+  readonly property var shownPrsToReview: Prs.settingOn(settings, "hideMyApprovedPrs")
+    ? Prs.withoutMyApprovedPrs(freshPrsToReview, viewerLogin) : freshPrsToReview
   readonly property var summary: Prs.barSummary(freshPrs)
   // An error shows as a red mark instead of a count.
   readonly property string badgeStatus: error !== "" ? "failing" : summary.status
   readonly property string badgeLabel: error !== "" ? iconError : String(summary.count)
-  readonly property var tabs: Prs.tabs(freshPrs, freshPrsToReview, loaded && error === "")
+  readonly property var tabs: Prs.tabs(freshPrs, shownPrsToReview, loaded && error === "")
   readonly property var currentTab: tabs[tabIndex]
 
   function colorFor(status) {
@@ -149,6 +152,7 @@ Panel {
                                 root.aiCheckNames)
       if (result.error === "") {
         root.lastPollTime = Date.now()
+        root.viewerLogin = result.viewerLogin
         var ids = Prs.prIdsNeedingDetails(root.lastPrs, result.prs)
         if (ids.length > 0) {
           root.pendingPoll = result

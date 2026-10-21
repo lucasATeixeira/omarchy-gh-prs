@@ -2,7 +2,7 @@
 
 **Authored PR**: an open PR that the user opened. _Avoid_: my PR, own PR.
 
-**PR to review**: an open PR where GitHub waits for the user's Review, because someone asked the user or one of the user's teams. It leaves the list when the user submits a Review, and comes back when someone asks again. _Avoid_: review request, reviewing PR.
+**PR to review**: an open PR where GitHub waits for the user's Review, because someone asked the user or one of the user's teams. It leaves the list when the user submits a Review, unless the request went to one of the user's teams, and comes back when someone asks again. _Avoid_: review request, reviewing PR.
 
 **Stale PR**: a PR whose last update is older than the max age the user chose for its Tab. The popup and the Badge hide Stale PRs, but they still send notifications. _Avoid_: old PR, expired PR.
 

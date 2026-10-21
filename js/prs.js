@@ -203,6 +203,29 @@ function withoutStalePrs(prs, maxAgeDays, now) {
     return prs.filter(function (pr) { return Date.parse(pr.updatedAt) >= oldestAllowed; });
 }
 
+/**
+ * Whether a reviewer's latest Review is an Approval.
+ * @param {Review} review
+ * @returns {boolean}
+ */
+function isApproval(review) {
+    return review.state === "APPROVED";
+}
+
+/**
+ * The PRs where the viewer's latest Review is not an Approval.
+ * @param {PullRequest[]} prs
+ * @param {string} viewerLogin
+ * @returns {PullRequest[]}
+ */
+function withoutMyApprovedPrs(prs, viewerLogin) {
+    return prs.filter(function (pr) {
+        return !pr.latestReviews.some(function (review) {
+            return review.author === viewerLogin && isApproval(review);
+        });
+    });
+}
+
 var SECTION_TITLES = { failing: "Failing", running: "Running", passing: "Passing", none: "No CI" };
 
 /**
@@ -312,7 +335,7 @@ function toPullRequest(node, aiCheckPatterns) {
         aiReviewDone: aiReviewDone(checks, aiCheckPatterns),
         reviewDecision: node.reviewDecision,
         unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length,
-        approvalCount: latestReviews.filter(function (review) { return review.state === "APPROVED"; }).length,
+        approvalCount: latestReviews.filter(isApproval).length,
         hasConflict: node.mergeable === "CONFLICTING",
         latestReviews: latestReviews
     };
@@ -652,6 +675,7 @@ function themeColors(toml) {
  * @property {number} [refreshIntervalSec]
  * @property {number} [authoredMaxAgeDays]
  * @property {number} [toReviewMaxAgeDays]
+ * @property {boolean} [hideMyApprovedPrs]
  * @property {string} [aiCheckNames]
  * @property {boolean} [notificationsEnabled]
  * @property {boolean} [notifyAiReviewDone]
@@ -722,7 +746,7 @@ function ciNotificationSetting(status) {
 /**
  * Whether a boolean setting is on; a missing key counts as on.
  * @param {WidgetSettings} settings
- * @param {"notificationsEnabled"|NotificationSetting} key
+ * @param {"hideMyApprovedPrs"|"notificationsEnabled"|NotificationSetting} key
  * @returns {boolean}
  */
 function settingOn(settings, key) {
@@ -768,6 +792,7 @@ if (typeof module !== "undefined") {
         removeAiCheckPattern: removeAiCheckPattern,
         barSummary: barSummary,
         withoutStalePrs: withoutStalePrs,
+        withoutMyApprovedPrs: withoutMyApprovedPrs,
         sections: sections,
         tabs: tabs,
         errorMessage: errorMessage,

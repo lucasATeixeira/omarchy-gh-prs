@@ -457,6 +457,44 @@ describe('withoutStalePrs', () => {
   })
 })
 
+describe('withoutMyApprovedPrs', () => {
+  const reviewedBy = (number, ...reviews) => Object.assign(pr('passing', undefined, number),
+    { latestReviews: reviews.map(([author, state]) => ({ id: author + number, state, author })) })
+
+  it('hides a PR the viewer approved', () => {
+    assert.deepEqual(P.withoutMyApprovedPrs([reviewedBy(1, ['me', 'APPROVED'])], 'me'), [])
+  })
+
+  it('hides a PR the viewer approved even when others requested changes', () => {
+    assert.deepEqual(P.withoutMyApprovedPrs([reviewedBy(1, ['ana', 'CHANGES_REQUESTED'], ['me', 'APPROVED'])], 'me'), [])
+  })
+
+  it('keeps a PR only someone else approved', () => {
+    const approvedByAna = reviewedBy(1, ['ana', 'APPROVED'])
+    assert.deepEqual(P.withoutMyApprovedPrs([approvedByAna], 'me'), [approvedByAna])
+  })
+
+  it('keeps a PR where the viewer only commented', () => {
+    const commented = reviewedBy(1, ['me', 'COMMENTED'])
+    assert.deepEqual(P.withoutMyApprovedPrs([commented], 'me'), [commented])
+  })
+
+  it('keeps a PR whose Approval was dismissed', () => {
+    const dismissed = reviewedBy(1, ['me', 'DISMISSED'])
+    assert.deepEqual(P.withoutMyApprovedPrs([dismissed], 'me'), [dismissed])
+  })
+
+  it('keeps a PR where the viewer requested changes', () => {
+    const changesRequested = reviewedBy(1, ['me', 'CHANGES_REQUESTED'])
+    assert.deepEqual(P.withoutMyApprovedPrs([changesRequested], 'me'), [changesRequested])
+  })
+
+  it('keeps a PR with no Reviews', () => {
+    const unreviewed = reviewedBy(1)
+    assert.deepEqual(P.withoutMyApprovedPrs([unreviewed], 'me'), [unreviewed])
+  })
+})
+
 describe('maxAgeDays', () => {
   it('keeps a value inside the range', () => {
     assert.equal(P.maxAgeDays(30), 30)

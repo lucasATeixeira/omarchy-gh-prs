@@ -57,7 +57,7 @@ FocusScope {
       width: parent.width
       spacing: Style.space(6)
 
-      PanelSectionHeader { text: "Hide stale PRs"; foreground: root.panel.foreground }
+      PanelSectionHeader { text: "Hide PRs"; foreground: root.panel.foreground }
 
       NumberField {
         label: "Authored: max days since last update"
@@ -80,6 +80,8 @@ FocusScope {
         fontFamily: root.panel.fontFamily
         onModified: function(value) { root.panel.saveSettings({ toReviewMaxAgeDays: value }) }
       }
+
+      SettingToggle { key: "hideMyApprovedPrs"; label: "Hide PRs I approved" }
     }
 
     Column {
