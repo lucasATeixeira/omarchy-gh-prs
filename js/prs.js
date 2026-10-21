@@ -13,6 +13,13 @@
  * @property {string} [state] StatusContext state.
  */
 
+/**
+ * A review thread as GitHub's GraphQL API returns it, with only its first comment.
+ * @typedef {Object} ReviewThreadNode
+ * @property {boolean} isResolved
+ * @property {{nodes: {author: ?{login: string}}[]}} comments
+ */
+
 /** @typedef {"failing"|"running"|"passing"|"none"} Status */
 
 /** @typedef {"APPROVED"|"CHANGES_REQUESTED"|"REVIEW_REQUIRED"} ReviewDecision */
@@ -332,6 +339,7 @@ function toPullRequest(node, aiCheckPatterns) {
     var checks = rollup ? rollup.contexts.nodes : [];
     var latestReviews = node.latestReviews.nodes.map(toReview);
     var isAiReviewDone = aiReviewDone(checks, aiCheckPatterns);
+    var hasAiThread = node.reviewThreads.nodes.some(function (thread) { return isAiThread(thread, aiCheckPatterns); });
     return {
         id: node.id,
         repo: node.repository.nameWithOwner,
@@ -343,7 +351,7 @@ function toPullRequest(node, aiCheckPatterns) {
         author: userLogin(node.author),
         status: prStatus(checks),
         aiReviewDone: isAiReviewDone,
-        aiChangesSuggested: isAiReviewDone && node.reviewThreads.nodes.some(function (thread) { return isAiThread(thread, aiCheckPatterns); }),
+        aiChangesSuggested: isAiReviewDone && hasAiThread,
         reviewDecision: node.reviewDecision,
         unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length,
         approvalCount: latestReviews.filter(isApproval).length,
@@ -354,12 +362,12 @@ function toPullRequest(node, aiCheckPatterns) {
 
 /**
  * Whether the thread is unresolved and an AI reviewer wrote its first comment.
- * @param {{isResolved: boolean, comments: {nodes: {author: ?{login: string}}[]}}} thread Raw review thread node.
- * @param {string[]} aiCheckPatterns Lowercase AI check patterns.
+ * @param {ReviewThreadNode} thread
+ * @param {string[]} patterns Lowercase AI check patterns.
  * @returns {boolean}
  */
-function isAiThread(thread, aiCheckPatterns) {
-    return !thread.isResolved && matchesAiCheckPattern(userLogin(thread.comments.nodes[0].author), aiCheckPatterns);
+function isAiThread(thread, patterns) {
+    return !thread.isResolved && matchesAiCheckPattern(userLogin(thread.comments.nodes[0].author), patterns);
 }
 
 function toReview(node) {

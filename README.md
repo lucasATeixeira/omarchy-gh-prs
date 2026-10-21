@@ -36,7 +36,7 @@ Click the gear in the popup header to change the settings. Changes apply right a
 | `refreshIntervalSec` | `10` | Seconds between GitHub queries, from 5 to 3600. |
 | `authoredMaxAgeDays` | `365` | Hide authored PRs with no update in this many days, from 1 to 365. Hidden PRs leave the list and the badge, but still send notifications. |
 | `toReviewMaxAgeDays` | `365` | Hide PRs to review with no update in this many days, from 1 to 365. |
-| `aiCheckNames` | `"CodeRabbit"` | Comma-separated AI check patterns: parts of check names that mark an AI code review. When every such check on a PR has finished, you get a notification: "AI review: changes suggested" or "AI review: no changes suggested". The row shows a robot icon only while a review thread started by an AI reviewer, a user whose login matches a pattern, is unresolved. Leave it empty to turn this off. |
+| `aiCheckNames` | `"CodeRabbit"` | Comma-separated AI check patterns: parts of check names that mark an AI code review. When every such check on a PR has finished, you get a notification: "AI review: changes suggested" or "AI review: no changes suggested". An AI reviewer is a user whose login matches a pattern. The row shows a robot icon while a review thread started by an AI reviewer is unresolved. Leave it empty to turn this off. |
 | `notificationsEnabled` | `true` | Turn off to stop every notification. |
 | `notifyAiReviewDone` | `true` | Notify when the AI review is done, with or without AI changes suggested. |
 | `notifyCiPassed` | `true` | Notify when CI passed. |
@@ -63,4 +63,3 @@ The spec lives in `.agent/scratch/gh-prs/spec.md`, and the domain terms are defi
 
 # Ideas
 - Add a refresh button
-- Add a `filter out prs with more then X days old` and add that to settings page so user can chose. It can be null, if it's null we don't filter out nothing. We should add one for authored and other for the to review

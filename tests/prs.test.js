@@ -320,7 +320,7 @@ const aiChangesSuggestedFor = (threads, aiCheckNames = 'CodeRabbit') =>
   P.parseRun(0, response([aiReviewedNode(threads)]), '', aiCheckNames).prs[0].aiChangesSuggested
 
 describe('parseRun AI changes suggested', () => {
-  it('is true when the AI review is done and an AI thread is unresolved', () => {
+  it('is true for an unresolved AI thread', () => {
     assert.equal(aiChangesSuggestedFor([thread(true), thread(false, 'coderabbitai')]), true)
   })
 
@@ -669,17 +669,17 @@ const polled = (number, status, aiReviewDone, aiChangesSuggested = false) =>
 const sent = (notifications) => notifications.map(n => [n.setting, n.title, n.pr.number])
 
 describe('pollNotifications', () => {
-  it('notifies AI changes suggested when the AI review is done with AI threads', () => {
+  it('notifies AI changes suggested', () => {
     const notifications = P.pollNotifications([polled(1, 'none', false)], [polled(1, 'none', true, true)], null, 'me')
     assert.deepEqual(sent(notifications), [['notifyAiReviewDone', 'AI review: changes suggested', 1]])
   })
 
-  it('notifies no AI changes suggested when the AI review is done without AI threads', () => {
+  it('notifies no AI changes suggested', () => {
     const notifications = P.pollNotifications([polled(1, 'none', false)], [polled(1, 'none', true)], null, 'me')
     assert.deepEqual(sent(notifications), [['notifyAiReviewDone', 'AI review: no changes suggested', 1]])
   })
 
-  it('sends nothing when AI changes are suggested after the AI review was done', () => {
+  it('sends nothing for AI changes suggested later', () => {
     assert.deepEqual(P.pollNotifications([polled(1, 'none', true)], [polled(1, 'none', true, true)], null, 'me'), [])
   })
 
