@@ -38,6 +38,8 @@ Panel {
 
   property var prs: []
   property var prsToReview: []
+  // Epoch milliseconds of the last successful poll; Stale PRs are measured from it.
+  property real lastPollTime: 0
   // PRs from the last successful poll; null until the first one.
   property var lastPrs: null
   // The successful main poll that waits for its details query.
@@ -50,12 +52,14 @@ Panel {
 
   readonly property string aiCheckNames: String(setting("aiCheckNames", "CodeRabbit"))
   readonly property int refreshIntervalSec: Prs.refreshIntervalSec(setting("refreshIntervalSec", 10))
+  readonly property int authoredMaxAgeDays: Prs.maxAgeDays(setting("authoredMaxAgeDays", Prs.MAX_AGE_DEFAULT_DAYS))
 
-  readonly property var summary: Prs.barSummary(prs)
+  readonly property var freshPrs: Prs.withoutStalePrs(prs, authoredMaxAgeDays, lastPollTime)
+  readonly property var summary: Prs.barSummary(freshPrs)
   // An error shows as a red mark instead of a count.
   readonly property string badgeStatus: error !== "" ? "failing" : summary.status
   readonly property string badgeLabel: error !== "" ? iconError : String(summary.count)
-  readonly property var tabs: Prs.tabs(prs, prsToReview, loaded && error === "")
+  readonly property var tabs: Prs.tabs(freshPrs, prsToReview, loaded && error === "")
   readonly property var currentTab: tabs[tabIndex]
 
   function colorFor(status) {
@@ -142,6 +146,7 @@ Panel {
       var result = Prs.parseRun(exitCode, String(fetchStdout.text), String(fetchStderr.text),
                                 root.aiCheckNames)
       if (result.error === "") {
+        root.lastPollTime = Date.now()
         var ids = Prs.prIdsNeedingDetails(root.lastPrs, result.prs)
         if (ids.length > 0) {
           root.pendingPoll = result

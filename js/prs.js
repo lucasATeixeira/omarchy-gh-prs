@@ -189,7 +189,21 @@ function barSummary(prs) {
     return { status: status, count: prs.filter(function (pr) { return pr.status === status; }).length };
 }
 
-var SECTION_TITLES = { failing: "Failing", running: "Running", passing: "Passing", none: "No CI" };
+var MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * The PRs that are not Stale: updated at most `maxAgeDays` × 24 hours before `now`.
+ * @param {PullRequest[]} prs
+ * @param {number} maxAgeDays
+ * @param {number} now Milliseconds since the epoch.
+ * @returns {PullRequest[]}
+ */
+function withoutStalePrs(prs, maxAgeDays, now) {
+    var oldestAllowed = now - maxAgeDays * MS_PER_DAY;
+    return prs.filter(function (pr) { return Date.parse(pr.updatedAt) >= oldestAllowed; });
+}
+
+var SECTION_TITLES ={ failing: "Failing", running: "Running", passing: "Passing", none: "No CI" };
 
 /**
  * One titled group of PRs in the panel.
@@ -636,6 +650,7 @@ function themeColors(toml) {
  * The widget's entry in `shell.json`, as far as this widget reads it.
  * @typedef {Object} WidgetSettings
  * @property {number} [refreshIntervalSec]
+ * @property {number} [authoredMaxAgeDays]
  * @property {string} [aiCheckNames]
  * @property {boolean} [notificationsEnabled]
  * @property {boolean} [notifyAiReviewDone]
@@ -666,6 +681,21 @@ function refreshIntervalSec(value) {
     var seconds = Math.round(Number(value));
     if (!isFinite(seconds)) return REFRESH_INTERVAL_DEFAULT_SEC;
     return Math.min(REFRESH_INTERVAL_MAX_SEC, Math.max(REFRESH_INTERVAL_MIN_SEC, seconds));
+}
+
+var MAX_AGE_MIN_DAYS = 1;
+var MAX_AGE_MAX_DAYS = 365;
+var MAX_AGE_DEFAULT_DAYS = 365;
+
+/**
+ * A Tab's max-age setting as whole days within the allowed range; the default when it is not a number.
+ * @param {unknown} value
+ * @returns {number}
+ */
+function maxAgeDays(value) {
+    var days = Math.round(Number(value));
+    if (!isFinite(days)) return MAX_AGE_DEFAULT_DAYS;
+    return Math.min(MAX_AGE_MAX_DAYS, Math.max(MAX_AGE_MIN_DAYS, days));
 }
 
 /**
@@ -716,11 +746,16 @@ if (typeof module !== "undefined") {
         REFRESH_INTERVAL_MIN_SEC: REFRESH_INTERVAL_MIN_SEC,
         REFRESH_INTERVAL_MAX_SEC: REFRESH_INTERVAL_MAX_SEC,
         refreshIntervalSec: refreshIntervalSec,
+        MAX_AGE_MIN_DAYS: MAX_AGE_MIN_DAYS,
+        MAX_AGE_MAX_DAYS: MAX_AGE_MAX_DAYS,
+        MAX_AGE_DEFAULT_DAYS: MAX_AGE_DEFAULT_DAYS,
+        maxAgeDays: maxAgeDays,
         parseAiCheckPatterns: parseAiCheckPatterns,
         addAiCheckPatterns: addAiCheckPatterns,
         joinAiCheckPatterns: joinAiCheckPatterns,
         removeAiCheckPattern: removeAiCheckPattern,
         barSummary: barSummary,
+        withoutStalePrs: withoutStalePrs,
         sections: sections,
         tabs: tabs,
         errorMessage: errorMessage,

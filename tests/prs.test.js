@@ -429,6 +429,53 @@ describe('refreshIntervalSec', () => {
   })
 })
 
+describe('withoutStalePrs', () => {
+  const now = Date.parse('2026-10-21T12:00:00Z')
+
+  it('keeps a PR updated inside the max age', () => {
+    const fresh = pr('passing', '2026-10-20T12:00:00Z')
+    assert.deepEqual(P.withoutStalePrs([fresh], 7, now), [fresh])
+  })
+
+  it('hides a PR updated before the max age', () => {
+    assert.deepEqual(P.withoutStalePrs([pr('failing', '2026-10-01T12:00:00Z')], 7, now), [])
+  })
+
+  it('keeps a PR exactly at the limit and hides one a millisecond older', () => {
+    const atLimit = pr('passing', '2026-10-14T12:00:00.000Z', 1)
+    const pastLimit = pr('passing', '2026-10-14T11:59:59.999Z', 2)
+    assert.deepEqual(P.withoutStalePrs([atLimit, pastLimit], 7, now), [atLimit])
+  })
+
+  it('keeps an empty list empty', () => {
+    assert.deepEqual(P.withoutStalePrs([], 7, now), [])
+  })
+})
+
+describe('maxAgeDays', () => {
+  it('keeps a value inside the range', () => {
+    assert.equal(P.maxAgeDays(30), 30)
+  })
+
+  it('clamps to the allowed range', () => {
+    assert.equal(P.maxAgeDays(0), 1)
+    assert.equal(P.maxAgeDays(1000), 365)
+  })
+
+  it('rounds to whole days', () => {
+    assert.equal(P.maxAgeDays(6.5), 7)
+  })
+
+  it('reads numeric strings', () => {
+    assert.equal(P.maxAgeDays('14'), 14)
+  })
+
+  it('falls back to the default for a value that is not a number', () => {
+    assert.equal(P.maxAgeDays('forever'), 365)
+    assert.equal(P.maxAgeDays(undefined), 365)
+  })
+})
+
 describe('parseAiCheckPatterns', () => {
   it('splits on commas and trims, keeping the case', () => {
     assert.deepEqual(P.parseAiCheckPatterns(' CodeRabbit ,Copilot'), ['CodeRabbit', 'Copilot'])

@@ -11,6 +11,7 @@ An Omarchy shell bar widget that shows the CI status of the user's open GitHub p
 
 - The `gh` CLI runs one GraphQL query with two searches, across all repos, drafts included, at most 50 each: the **Authored PRs** (`author:@me`) and the **PRs to review** (`review-requested:@me`, which includes the user's teams). Both read the same PR fields.
 - The Bar, the Badge, the notifications, and the details query use only the Authored PRs.
+- **Stale PRs**: an Authored PR whose `updatedAt` is more than `authoredMaxAgeDays` × 24 hours before the last successful poll is Stale. A PR exactly at the limit is not Stale. The widget filters after the fetch, so the searches still return at most 50 PRs each. The popup and the Badge hide Stale PRs; the notifications, the details query, and the last seen PRs use every Authored PR.
 - CI comes from the latest commit's `statusCheckRollup`. All **Checks** count, not only required ones.
 - The same query also reads each PR's `reviewDecision`, `mergeable`, and review threads' `isResolved`.
 - The same query also reads each PR's node `id` and the viewer's login. It costs 2 points, measured with `rateLimit(dryRun: true)`.
@@ -36,7 +37,7 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 ## Bar
 
 - The GitHub Nerd Font icon is always shown.
-- The **Badge** shows the **Bar summary**: the worst Status and how many PRs have it.
+- The **Badge** shows the **Bar summary**: the worst Status and how many PRs have it. It skips Stale PRs.
 - The Badge is a filled disc at the icon's top-right corner, in the Status color, with the count in bold text and a thin rim in the bar background color. It widens to a pill for 2-digit counts.
 - On error: a red Badge with `✕`.
 - No Badge when every PR is `none`, or there are no PRs.
@@ -52,7 +53,8 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 - Sections, in order: Failing, Running, Passing, No CI. Empty Sections are hidden. Each Section header shows its dot (~8px, larger than the row dot) and PR count. Inside a Section, the most recently updated PR comes first.
 - Row: a small Status dot (~5px), `owner/repo#123`, the title elided with "…", and a "draft" label after the title when the PR is a draft. Clicking a row opens the PR in the browser and closes the popup.
 - Before the first fetch ends: no list and no empty message.
-- Zero PRs: "No open pull requests" on Authored, "No PRs to review" on To review.
+- The Authored Tab, its count, and the header's Bar summary skip Stale PRs. No hint shows that PRs are hidden.
+- Zero PRs, or every PR Stale: "No open pull requests" on Authored, "No PRs to review" on To review.
 - Escape closes the popup, and Tab switches to the next bar panel, like the shell's own panels.
 - `h` or Left selects Authored, and `l` or Right selects To review. These keys do nothing while Settings is open.
 - On error: only the error message, on both Tabs. When the cause is auth, the message is "Not logged in to GitHub. Run: gh auth login". The error clears on the next successful poll.
@@ -132,7 +134,7 @@ A gear button in the popup lets the user change the widget's settings without ed
 
 - A gear button (`nf-md-cog`) sits on the right of the popup header, next to the Bar summary. Clicking it replaces the PR list with the settings page.
 - While the page is open, the header title is "Settings" and the gear becomes a back arrow (`nf-md-arrow_left`). The back arrow or Escape returns to the PR list.
-- Three plain sections, in order: Refresh, AI checks, Notifications. No collapsing.
+- Four plain sections, in order: Refresh, Hide stale PRs, AI checks, Notifications. No collapsing.
 - Every change applies right away and is saved to the widget's entry in `shell.json` through `bar.shell.updateEntryInline`. Toggles save on click; fields save on Enter or when they lose focus. All other keys in the entry are kept.
 
 ### Refresh
@@ -140,6 +142,12 @@ A gear button in the popup lets the user change the widget's settings without ed
 - `refreshIntervalSec`: a whole number of seconds, from 5 to 3600, default 10.
 - A number field with up and down arrows that step by 5. A typed value outside the range is clamped to the nearest limit; a value that is not a number goes back to the saved value.
 - The poll timer uses the new interval right away.
+
+### Hide stale PRs
+
+- `authoredMaxAgeDays`: a whole number of days, from 1 to 365, default 365. Label: "Authored: max days since last update".
+- A number field with up and down arrows that step by 1. A typed value outside the range is clamped to the nearest limit; a value in `shell.json` that is not a number counts as 365.
+- The Authored Tab and the Badge use the new value right away, measured from the last successful poll.
 
 ### AI checks
 
@@ -169,7 +177,7 @@ A gear button in the popup lets the user change the widget's settings without ed
 
 ### Manifest
 
-- `defaults` and `schema` list every key above, so they can still be edited by hand. `refreshIntervalSec` is an `integer` with `min: 5` and `max: 3600`; the notification keys are `boolean`.
+- `defaults` and `schema` list every key above, so they can still be edited by hand. `refreshIntervalSec` is an `integer` with `min: 5` and `max: 3600`; `authoredMaxAgeDays` is an `integer` with `min: 1`, `max: 365`, and `step: 1`; the notification keys are `boolean`.
 
 ## Tests
 

@@ -57,6 +57,24 @@ FocusScope {
       width: parent.width
       spacing: Style.space(6)
 
+      PanelSectionHeader { text: "Hide stale PRs"; foreground: root.panel.foreground }
+
+      NumberField {
+        label: "Authored: max days since last update"
+        from: Prs.MAX_AGE_MIN_DAYS
+        to: Prs.MAX_AGE_MAX_DAYS
+        stepSize: 1
+        value: root.panel.authoredMaxAgeDays
+        foreground: root.panel.foreground
+        fontFamily: root.panel.fontFamily
+        onModified: function(value) { root.panel.saveSettings({ authoredMaxAgeDays: value }) }
+      }
+    }
+
+    Column {
+      width: parent.width
+      spacing: Style.space(6)
+
       PanelSectionHeader { text: "AI check patterns"; foreground: root.panel.foreground }
 
       Text {
