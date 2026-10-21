@@ -70,7 +70,7 @@ Some repos run an AI code reviewer in CI, such as CodeRabbit. The widget tells t
 - **AI thread**: an Unresolved thread whose first comment is from an AI reviewer. Threads where the AI only replied do not count.
 - **AI changes suggested**: the AI review is done and the PR has at least one AI thread.
 - Row: a robot icon to the right of the Status dot when the PR has AI changes suggested, with no count. Always in the normal text color. The same rule applies on both Tabs. A PR whose AI review found nothing shows no robot.
-- Notification: when a PR was seen in the last successful poll as not done and is done now. Title `AI review done`, body `owner/repo#123 — <PR title>`. Clicking it opens the PR.
+- Notification: when a PR was seen in the last successful poll as not done and is done now. Title `AI review: changes suggested` when the PR has AI changes suggested, and `AI review: no changes suggested` otherwise. Body `owner/repo#123 — <PR title>`. Clicking it opens the PR. Only one AI notification per finished AI review: AI changes suggested appearing later sends nothing.
 - No notification on the first poll after a start, or for a PR seen for the first time.
 - A failed poll does not change the last seen PRs.
 - Bot PR reviews without a Check, such as Copilot's, are out of scope.
@@ -167,7 +167,7 @@ A gear button in the popup lets the user change the widget's settings without ed
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `notificationsEnabled` | `true` | Master switch. When off, no notification is sent. |
-| `notifyAiReviewDone` | `true` | Send `AI review done`. |
+| `notifyAiReviewDone` | `true` | Send `AI review: changes suggested` and `AI review: no changes suggested`. |
 | `notifyCiPassed` | `true` | Send `CI passed`. |
 | `notifyCiFailed` | `true` | Send `CI failed`. |
 | `notifyApproved` | `true` | Send `Approved by <login>`. |
