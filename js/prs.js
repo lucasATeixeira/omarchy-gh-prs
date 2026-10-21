@@ -302,7 +302,7 @@ function sections(prs) {
  * The popup's Tabs in order.
  * @param {PullRequest[]} authoredPrs
  * @param {PullRequest[]} prsToReview
- * @param {boolean} showCounts False before the first fetch ends and on error.
+ * @param {boolean} showCounts False until the first successful poll.
  * @returns {Tab[]}
  */
 function tabs(authoredPrs, prsToReview, showCounts) {
