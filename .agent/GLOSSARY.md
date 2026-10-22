@@ -12,7 +12,7 @@
 
 **Tab**: one of the two lists in the popup: Authored, with the Authored PRs, and To review, with the PRs to review. _Avoid_: page, view.
 
-**Check**: one CI result on a PR's latest commit. In the GitHub API it is a `CheckRun` (GitHub Actions and apps) or a `StatusContext` (commit statuses). _Avoid_: job, build.
+**Check**: the latest run of one CI job on a PR's latest commit. An older run of the same job, such as a cancelled run that a rerun replaced, is not a Check. In the GitHub API it is a `CheckRun` (GitHub Actions and apps) or a `StatusContext` (commit statuses). _Avoid_: job, build.
 
 **AI Check**: a Check made by an AI code reviewer, such as CodeRabbit. A Check is an AI Check when its name matches an AI check pattern. An AI Check still counts toward its PR's Status like any other Check. _Avoid_: AI review, bot review.
 

@@ -6,7 +6,10 @@ const { loadQmlLibrary } = require('./load.js')
 
 const P = loadQmlLibrary('js/prs.js')
 
-const run = (status, conclusion, name = 'tests') => ({ __typename: 'CheckRun', name, status, conclusion })
+let nextRunId = 1
+const run = (status, conclusion, name = 'tests', workflow = null, databaseId = nextRunId++) => ({
+  __typename: 'CheckRun', name, status, conclusion, databaseId, checkSuite: { workflowRun: workflow && { workflow: { name: workflow } } }
+})
 const ctx = (state, context = 'ci/lint') => ({ __typename: 'StatusContext', context, state })
 
 describe('prStatus', () => {
@@ -202,6 +205,34 @@ describe('parseRun AI review', () => {
   })
 })
 
+const statusFor = (checks) => P.parseRun(0, response([withChecks(checks)]), '', '').prs[0].status
+
+describe('parseRun repeated runs', () => {
+  it('drops a run that a later run of the same job replaced', () => {
+    const checks = [run('COMPLETED', 'SUCCESS', 'tests', 'PR Tests', 8), run('COMPLETED', 'CANCELLED', 'tests', 'PR Tests', 7)]
+    assert.equal(statusFor(checks), 'passing')
+  })
+
+  it('runs while a rerun of a failed job runs', () => {
+    const checks = [run('COMPLETED', 'FAILURE', 'tests', 'PR Tests', 7), run('IN_PROGRESS', null, 'tests', 'PR Tests', 8)]
+    assert.equal(statusFor(checks), 'running')
+  })
+
+  it('keeps jobs with the same name in different workflows', () => {
+    const checks = [run('COMPLETED', 'FAILURE', 'tests', 'Lint', 7), run('COMPLETED', 'SUCCESS', 'tests', 'PR Tests', 8)]
+    assert.equal(statusFor(checks), 'failing')
+  })
+
+  it('matches app checks without a workflow by name', () => {
+    const checks = [run('COMPLETED', 'FAILURE', 'Bugbot', null, 7), run('COMPLETED', 'SUCCESS', 'Bugbot', null, 8)]
+    assert.equal(statusFor(checks), 'passing')
+  })
+
+  it('still fails on a cancelled run that nothing replaced', () => {
+    assert.equal(statusFor([run('COMPLETED', 'CANCELLED', 'tests', 'PR Tests')]), 'failing')
+  })
+})
+
 const reviewed = (number, done) => Object.assign(pr('running', undefined, number), { url: 'u' + number, aiReviewDone: done })
 
 describe('finishedAiReviews', () => {
@@ -384,6 +415,11 @@ describe('parseRun conflict', () => {
 })
 
 describe('QUERY', () => {
+  it('reads the id and workflow of each check run', () => {
+    assert.match(P.QUERY, /on CheckRun \{[^}]*\bdatabaseId\b/)
+    assert.match(P.QUERY, /workflowRun \{ workflow \{ name \} \}/)
+  })
+
   it('reads the review decision', () => {
     assert.match(P.QUERY, /\breviewDecision\b/)
   })

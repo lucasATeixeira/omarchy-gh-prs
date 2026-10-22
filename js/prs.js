@@ -11,6 +11,8 @@
  * @property {string} [status] CheckRun progress, e.g. "IN_PROGRESS" or "COMPLETED".
  * @property {?string} [conclusion] CheckRun result once completed.
  * @property {string} [state] StatusContext state.
+ * @property {number} [databaseId] CheckRun id; a later run has a higher id.
+ * @property {{workflowRun: ?{workflow: {name: string}}}} [checkSuite] CheckRun suite; app checks have no workflow run.
  */
 
 /**
@@ -101,6 +103,29 @@ function checkStatus(check) {
  */
 function checkName(check) {
     return check.__typename === "CheckRun" ? check.name : check.context;
+}
+
+/**
+ * Keeps only the latest run of each CI job.
+ * @param {CheckContext[]} checks
+ * @returns {CheckContext[]}
+ */
+function latestChecks(checks) {
+    return checks.filter(function (check) {
+        return check.__typename !== "CheckRun" || !checks.some(function (other) {
+            return other.__typename === "CheckRun" && jobName(other) === jobName(check) && other.databaseId > check.databaseId;
+        });
+    });
+}
+
+/**
+ * The CheckRun name, after its workflow name when it has one.
+ * @param {CheckContext} check A CheckRun.
+ * @returns {string}
+ */
+function jobName(check) {
+    var workflowRun = check.checkSuite.workflowRun;
+    return workflowRun ? workflowRun.workflow.name + " / " + check.name : check.name;
 }
 
 /**
@@ -340,7 +365,7 @@ var QUERY = "query { viewer { login organizations(first: 100) { nodes { teams(fi
     + " reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login } } } } }"
     + " latestReviews(first: 20) { nodes { id state author { login } } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
-    + " __typename ... on CheckRun { name status conclusion } ... on StatusContext { context state } } } } } } } }";
+    + " __typename ... on CheckRun { name status conclusion databaseId checkSuite { workflowRun { workflow { name } } } } ... on StatusContext { context state } } } } } } } }";
 
 /**
  * Turns one `gh api graphql` run with QUERY into the PRs to show, or an error.
@@ -372,7 +397,7 @@ function parseRun(exitCode, stdout, stderr, aiCheckNames) {
 
 function toPullRequest(node, aiCheckPatterns, teams) {
     var rollup = node.commits.nodes[0].commit.statusCheckRollup;
-    var checks = rollup ? rollup.contexts.nodes : [];
+    var checks = rollup ? latestChecks(rollup.contexts.nodes) : [];
     var latestReviews = node.latestReviews.nodes.map(toReview);
     var isAiReviewDone = aiReviewDone(checks, aiCheckPatterns);
     var hasAiThread = node.reviewThreads.nodes.some(function (thread) { return isAiThread(thread, aiCheckPatterns); });
