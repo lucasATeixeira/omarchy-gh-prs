@@ -20,6 +20,20 @@
  * @property {{nodes: {author: ?{login: string}}[]}} comments
  */
 
+/**
+ * A review request event as GitHub's GraphQL API returns it.
+ * @typedef {Object} ReviewRequestNode
+ * @property {string} createdAt ISO 8601 timestamp.
+ * @property {?{isViewer?: boolean, combinedSlug?: string}} requestedReviewer A User has `isViewer` and a Team has `combinedSlug`. Other reviewers have neither, and a deleted one is null.
+ */
+
+/**
+ * The logged-in user as GitHub's GraphQL API returns it, with the teams the user is in.
+ * @typedef {Object} ViewerNode
+ * @property {string} login
+ * @property {{nodes: {teams: {nodes: {combinedSlug: string}[]}}[]}} organizations
+ */
+
 /** @typedef {"failing"|"running"|"passing"|"none"} Status */
 
 /** @typedef {"APPROVED"|"CHANGES_REQUESTED"|"REVIEW_REQUIRED"} ReviewDecision */
@@ -44,6 +58,7 @@
  * @property {string} url
  * @property {boolean} isDraft
  * @property {string} updatedAt ISO 8601 timestamp.
+ * @property {string} reviewRequestedAt ISO 8601 timestamp of the latest Review request, or of the PR's creation when there is none.
  * @property {string} author Login of who opened the PR.
  * @property {Status} status
  * @property {boolean} aiReviewDone
@@ -208,16 +223,19 @@ function barSummary(prs) {
 var MS_PER_MINUTE = 60 * 1000;
 var MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
 
+/** @typedef {"updatedAt"|"reviewRequestedAt"} AgeStart The PR timestamp a Tab measures age from. */
+
 /**
- * The PRs that are not Stale: updated at most `maxAgeDays` × 24 hours before `now`.
+ * The PRs that are not Stale: their `ageStart` is at most `maxAgeDays` × 24 hours before `now`.
  * @param {PullRequest[]} prs
  * @param {number} maxAgeDays
  * @param {number} now Milliseconds since the epoch.
+ * @param {AgeStart} ageStart
  * @returns {PullRequest[]}
  */
-function withoutStalePrs(prs, maxAgeDays, now) {
+function withoutStalePrs(prs, maxAgeDays, now, ageStart) {
     var oldestAllowed = now - maxAgeDays * MS_PER_DAY;
-    return prs.filter(function (pr) { return Date.parse(pr.updatedAt) >= oldestAllowed; });
+    return prs.filter(function (pr) { return Date.parse(pr[ageStart]) >= oldestAllowed; });
 }
 
 /**
@@ -313,11 +331,12 @@ function tabs(authoredPrs, prsToReview, showCounts) {
     ];
 }
 
-/** GraphQL query for the 50 most recently updated Authored PRs and PRs to review, with the fields each row shows. */
-var QUERY = "query { viewer { login }"
+/** GraphQL query for the viewer's teams and the 50 most recently updated Authored PRs and PRs to review, with the fields each row shows. */
+var QUERY = "query { viewer { login organizations(first: 100) { nodes { teams(first: 100, role: MEMBER) { nodes { combinedSlug } } } } }"
     + " authoredPrs: search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } }"
     + " prsToReview: search(query: \"is:pr is:open review-requested:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } } }"
-    + " fragment PrFields on PullRequest { id number title url isDraft updatedAt author { login } reviewDecision mergeable repository { nameWithOwner }"
+    + " fragment PrFields on PullRequest { id number title url isDraft createdAt updatedAt author { login } reviewDecision mergeable repository { nameWithOwner }"
+    + " timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 20) { nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer { ... on User { isViewer } ... on Team { combinedSlug } } } } }"
     + " reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login } } } } }"
     + " latestReviews(first: 20) { nodes { id state author { login } } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
@@ -336,8 +355,9 @@ function parseRun(exitCode, stdout, stderr, aiCheckNames) {
     try {
         var patterns = aiCheckPatterns(aiCheckNames);
         var data = JSON.parse(stdout).data;
+        var teams = viewerTeams(data.viewer);
         var toPullRequests = function (search) {
-            return search.nodes.map(function (node) { return toPullRequest(node, patterns); });
+            return search.nodes.map(function (node) { return toPullRequest(node, patterns, teams); });
         };
         return {
             prs: toPullRequests(data.authoredPrs),
@@ -350,7 +370,7 @@ function parseRun(exitCode, stdout, stderr, aiCheckNames) {
     }
 }
 
-function toPullRequest(node, aiCheckPatterns) {
+function toPullRequest(node, aiCheckPatterns, teams) {
     var rollup = node.commits.nodes[0].commit.statusCheckRollup;
     var checks = rollup ? rollup.contexts.nodes : [];
     var latestReviews = node.latestReviews.nodes.map(toReview);
@@ -364,6 +384,7 @@ function toPullRequest(node, aiCheckPatterns) {
         url: node.url,
         isDraft: node.isDraft,
         updatedAt: node.updatedAt,
+        reviewRequestedAt: latestReviewRequestAt(node.timelineItems.nodes, teams) || node.createdAt,
         author: userLogin(node.author),
         status: prStatus(checks),
         aiReviewDone: isAiReviewDone,
@@ -384,6 +405,33 @@ function toPullRequest(node, aiCheckPatterns) {
  */
 function isAiThread(thread, patterns) {
     return !thread.isResolved && matchesAiCheckPattern(userLogin(thread.comments.nodes[0].author), patterns);
+}
+
+/**
+ * The "org/slug" of every team the viewer is in.
+ * @param {ViewerNode} viewer
+ * @returns {string[]}
+ */
+function viewerTeams(viewer) {
+    var teams = [];
+    viewer.organizations.nodes.forEach(function (organization) {
+        organization.teams.nodes.forEach(function (team) { teams.push(team.combinedSlug); });
+    });
+    return teams;
+}
+
+/**
+ * When the latest Review request happened: a request to the viewer or to one of `teams`; empty when there is none.
+ * @param {ReviewRequestNode[]} requests Oldest first.
+ * @param {string[]} teams The viewer's teams.
+ * @returns {string}
+ */
+function latestReviewRequestAt(requests, teams) {
+    var reviewRequests = requests.filter(function (request) {
+        var reviewer = request.requestedReviewer;
+        return reviewer !== null && (reviewer.isViewer === true || teams.indexOf(reviewer.combinedSlug) !== -1);
+    });
+    return reviewRequests.length > 0 ? reviewRequests[reviewRequests.length - 1].createdAt : "";
 }
 
 function toReview(node) {

@@ -57,8 +57,8 @@ Panel {
   readonly property int authoredMaxAgeDays: Prs.maxAgeDays(setting("authoredMaxAgeDays", Prs.MAX_AGE_DEFAULT_DAYS))
   readonly property int toReviewMaxAgeDays: Prs.maxAgeDays(setting("toReviewMaxAgeDays", Prs.MAX_AGE_DEFAULT_DAYS))
 
-  readonly property var freshPrs: Prs.withoutStalePrs(prs, authoredMaxAgeDays, lastPollTime)
-  readonly property var freshPrsToReview: Prs.withoutStalePrs(prsToReview, toReviewMaxAgeDays, lastPollTime)
+  readonly property var freshPrs: Prs.withoutStalePrs(prs, authoredMaxAgeDays, lastPollTime, "updatedAt")
+  readonly property var freshPrsToReview: Prs.withoutStalePrs(prsToReview, toReviewMaxAgeDays, lastPollTime, "reviewRequestedAt")
   readonly property var shownPrsToReview: Prs.settingOn(settings, "hideMyApprovedPrs")
     ? Prs.withoutMyApprovedPrs(freshPrsToReview, viewerLogin) : freshPrsToReview
   readonly property var summary: Prs.barSummary(freshPrs)

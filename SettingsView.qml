@@ -71,7 +71,7 @@ FocusScope {
       }
 
       NumberField {
-        label: "To review: max days since last update"
+        label: "To review: max days since review was requested"
         from: Prs.MAX_AGE_MIN_DAYS
         to: Prs.MAX_AGE_MAX_DAYS
         stepSize: 1

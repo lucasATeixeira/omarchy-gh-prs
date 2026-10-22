@@ -45,7 +45,9 @@ const prNode = (overrides) => Object.assign({
   title: 'Add widget',
   url: 'https://github.com/acme/app/pull/7',
   isDraft: false,
+  createdAt: '2026-10-18T10:00:00Z',
   updatedAt: '2026-10-19T10:00:00Z',
+  timelineItems: { nodes: [] },
   author: { login: 'alice' },
   reviewDecision: 'APPROVED',
   reviewThreads: { nodes: [] },
@@ -55,8 +57,12 @@ const prNode = (overrides) => Object.assign({
   commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [run('COMPLETED', 'FAILURE')] } } } }] }
 }, overrides)
 
-const response = (nodes, toReviewNodes = []) => JSON.stringify({
-  data: { viewer: { login: 'me' }, authoredPrs: { nodes }, prsToReview: { nodes: toReviewNodes } }
+const response = (nodes, toReviewNodes = [], teams = []) => JSON.stringify({
+  data: {
+    viewer: { login: 'me', organizations: { nodes: [{ teams: { nodes: teams.map((combinedSlug) => ({ combinedSlug })) } }] } },
+    authoredPrs: { nodes },
+    prsToReview: { nodes: toReviewNodes }
+  }
 })
 
 describe('parseRun success', () => {
@@ -70,6 +76,7 @@ describe('parseRun success', () => {
         url: 'https://github.com/acme/app/pull/7',
         isDraft: false,
         updatedAt: '2026-10-19T10:00:00Z',
+        reviewRequestedAt: '2026-10-18T10:00:00Z',
         author: 'alice',
         status: 'failing',
         aiReviewDone: false,
@@ -401,9 +408,18 @@ describe('QUERY', () => {
     assert.match(P.QUERY, /PrFields on PullRequest \{[^}]*\bauthor \{ login \}/)
   })
 
+  it('reads the teams the viewer is in', () => {
+    assert.match(P.QUERY, /viewer \{[^]*organizations\(first: 100\) \{ nodes \{ teams\(first: 100, role: MEMBER\) \{ nodes \{ combinedSlug \} \} \} \}/)
+  })
+
+  it('reads when the PR was created and whom each review request went to', () => {
+    assert.match(P.QUERY, /PrFields on PullRequest \{[^}]*\bcreatedAt\b/)
+    assert.match(P.QUERY, /timelineItems\(itemTypes: \[REVIEW_REQUESTED_EVENT\], last: 20\) \{ nodes \{ \.\.\. on ReviewRequestedEvent \{ createdAt requestedReviewer \{ \.\.\. on User \{ isViewer \} \.\.\. on Team \{ combinedSlug \} \} \} \} \}/)
+  })
+
   it('reads the PR id and the viewer login', () => {
     assert.match(P.QUERY, /PullRequest \{ id\b/)
-    assert.match(P.QUERY, /viewer \{ login \}/)
+    assert.match(P.QUERY, /viewer \{ login\b/)
   })
 })
 
@@ -484,26 +500,66 @@ describe('refreshIntervalSec', () => {
   })
 })
 
+const requestTo = (createdAt, requestedReviewer) => ({ createdAt, requestedReviewer })
+const toMe = { isViewer: true }
+const toTeam = (combinedSlug) => ({ combinedSlug })
+const requestNode = (requests, overrides) => prNode(Object.assign({ timelineItems: { nodes: requests } }, overrides))
+const reviewRequestedAt = (node, teams) => P.parseRun(0, response([], [node], teams), '', '').prsToReview[0].reviewRequestedAt
+
+describe('parseRun review request', () => {
+  it('is the latest Review request to the viewer', () => {
+    const node = requestNode([requestTo('2026-10-01T10:00:00Z', toMe), requestTo('2026-10-05T10:00:00Z', toMe)])
+    assert.equal(reviewRequestedAt(node), '2026-10-05T10:00:00Z')
+  })
+
+  it('counts a Review request to a team the viewer is in', () => {
+    const node = requestNode([requestTo('2026-10-01T10:00:00Z', toMe), requestTo('2026-10-05T10:00:00Z', toTeam('acme/frontend'))])
+    assert.equal(reviewRequestedAt(node, ['acme/frontend']), '2026-10-05T10:00:00Z')
+  })
+
+  it('ignores requests to other people and other teams', () => {
+    const node = requestNode([
+      requestTo('2026-10-01T10:00:00Z', toTeam('acme/frontend')),
+      requestTo('2026-10-05T10:00:00Z', { isViewer: false }),
+      requestTo('2026-10-05T11:00:00Z', {}),
+      requestTo('2026-10-06T10:00:00Z', toTeam('acme/backend')),
+      requestTo('2026-10-07T10:00:00Z', null)
+    ])
+    assert.equal(reviewRequestedAt(node, ['acme/frontend']), '2026-10-01T10:00:00Z')
+  })
+
+  it('falls back to the PR creation when no Review request is found', () => {
+    const node = requestNode([requestTo('2026-10-05T10:00:00Z', toTeam('acme/backend'))], { createdAt: '2026-09-24T15:51:45Z' })
+    assert.equal(reviewRequestedAt(node, ['acme/frontend']), '2026-09-24T15:51:45Z')
+  })
+})
+
 describe('withoutStalePrs', () => {
   const now = Date.parse('2026-10-21T12:00:00Z')
 
   it('keeps a PR updated inside the max age', () => {
     const fresh = pr('passing', '2026-10-20T12:00:00Z')
-    assert.deepEqual(P.withoutStalePrs([fresh], 7, now), [fresh])
+    assert.deepEqual(P.withoutStalePrs([fresh], 7, now, 'updatedAt'), [fresh])
   })
 
   it('hides a PR updated before the max age', () => {
-    assert.deepEqual(P.withoutStalePrs([pr('failing', '2026-10-01T12:00:00Z')], 7, now), [])
+    assert.deepEqual(P.withoutStalePrs([pr('failing', '2026-10-01T12:00:00Z')], 7, now, 'updatedAt'), [])
   })
 
   it('treats the limit as inclusive', () => {
     const atLimit = pr('passing', '2026-10-14T12:00:00.000Z', 1)
     const pastLimit = pr('passing', '2026-10-14T11:59:59.999Z', 2)
-    assert.deepEqual(P.withoutStalePrs([atLimit, pastLimit], 7, now), [atLimit])
+    assert.deepEqual(P.withoutStalePrs([atLimit, pastLimit], 7, now, 'updatedAt'), [atLimit])
   })
 
   it('keeps an empty list empty', () => {
-    assert.deepEqual(P.withoutStalePrs([], 7, now), [])
+    assert.deepEqual(P.withoutStalePrs([], 7, now, 'updatedAt'), [])
+  })
+
+  it('can measure the age from the latest Review request', () => {
+    const recentlyUpdated = Object.assign(pr('passing', '2026-10-20T12:00:00Z', 1), { reviewRequestedAt: '2026-09-24T12:00:00Z' })
+    const recentlyRequested = Object.assign(pr('passing', '2026-10-20T12:00:00Z', 2), { reviewRequestedAt: '2026-10-20T12:00:00Z' })
+    assert.deepEqual(P.withoutStalePrs([recentlyUpdated, recentlyRequested], 7, now, 'reviewRequestedAt'), [recentlyRequested])
   })
 })
 
