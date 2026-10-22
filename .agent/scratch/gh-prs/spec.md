@@ -52,7 +52,7 @@ Each **Check** is classified, then a PR takes the worst Status among its Checks.
 - Both Tabs show their PRs in the same Sections and rows. To review rows also show the author as `@login` in muted text after `owner/repo#123`.
 - A thin scrollbar on the right appears only when the list overflows.
 - Sections, in order: Failing, Running, Passing, No CI. Empty Sections are hidden. Each Section header shows its dot (~8px, larger than the row dot) and PR count. Inside a Section, the most recently updated PR comes first.
-- Row: a small Status dot (~5px), `owner/repo#123`, the title elided with "…", and a "draft" label after the title when the PR is a draft. Clicking a row opens the PR in the browser and closes the popup.
+- Row: a left gutter with a small Status dot (~4px) and the row icons, centered on two lines of text. Line 1 is the title, on one line, elided with "…". Line 2 is muted: `draft · ` when the PR is a draft, then `owner/repo#123`, elided with "…". Clicking a row opens the PR in the browser and closes the popup.
 - Before the first fetch ends: no list and no empty message.
 - Both Tabs, their counts, and the header's Bar summary skip Stale PRs. No hint shows that PRs are hidden.
 - Zero PRs, or every PR Stale: "No open pull requests" on Authored, "No PRs to review" on To review.
@@ -119,7 +119,7 @@ The widget tells the user when a reviewer approves a PR or requests changes. Thi
 
 Icons on each row show if a PR is ready to merge. They do not change Status, Sections, or the Badge.
 
-- Row order: Status dot, robot, **Approval** icon with count, **Review decision** icon, **Unresolved thread** icon with count, **Conflict** icon, then `owner/repo#123`, the title, and "draft".
+- Icon order in the gutter, after the Status dot: robot, **Approval** icon with count, **Review decision** icon, **Unresolved thread** icon with count, **Conflict** icon.
 - Each icon is hidden when it does not apply, so it takes no space.
 - All row icons, the robot included, use the `caption` font size and the normal text color.
 - Approvals: `nf-md-check_circle` followed by the PR's approval count: the reviewers whose latest Review in `latestReviews` is `APPROVED`. Dismissed reviews do not count; bot approvals do. It shows whatever the Review decision is, so a PR can show it next to the changes-requested icon. No icon when the count is 0.

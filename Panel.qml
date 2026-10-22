@@ -329,7 +329,7 @@ Panel {
               StatusDot {
                 anchors.verticalCenter: parent.verticalCenter
                 status: row.modelData.status
-                size: Math.round(Style.font.caption * 0.5)
+                size: Math.round(Style.font.caption * 0.35)
               }
 
               RowIcon {
@@ -357,36 +357,33 @@ Panel {
                 text: root.iconConflict
               }
 
-              Text {
+              // The title, and below it the muted PR reference.
+              Column {
                 anchors.verticalCenter: parent.verticalCenter
-                text: row.modelData.repo + "#" + row.modelData.number + (list.showAuthor ? " @" + row.modelData.author : "")
-                textFormat: Text.PlainText
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-                color: Commons.Color.muted
-              }
+                width: rowContent.width - x
+                spacing: Style.space(2)
 
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: rowContent.width - x - (draftLabel.visible ? draftLabel.width + rowContent.spacing : 0)
-                text: row.modelData.title
-                textFormat: Text.PlainText
-                elide: Text.ElideRight
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                color: root.foreground
-              }
+                Text {
+                  width: parent.width
+                  text: row.modelData.title
+                  textFormat: Text.PlainText
+                  elide: Text.ElideRight
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                  color: root.foreground
+                }
 
-              Text {
-                id: draftLabel
-                anchors.verticalCenter: parent.verticalCenter
-                visible: row.modelData.isDraft
-                text: "draft"
-                textFormat: Text.PlainText
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                font.italic: true
-                color: Commons.Color.muted
+                Text {
+                  width: parent.width
+                  text: (row.modelData.isDraft ? "draft · " : "")
+                    + row.modelData.repo + "#" + row.modelData.number
+                    + (list.showAuthor ? " @" + row.modelData.author : "")
+                  textFormat: Text.PlainText
+                  elide: Text.ElideRight
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  color: Commons.Color.muted
+                }
               }
             }
 
