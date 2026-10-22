@@ -17,7 +17,7 @@ An Omarchy shell bar widget that shows the CI status of the user's open GitHub p
 - The same query also reads each PR's node `id` and the viewer's login. It costs 2 points, measured with `rateLimit(dryRun: true)`.
 - **Details query**: for PRs of the last successful poll that are missing from the current one or whose `updatedAt` changed, a second query, `nodes(ids: ...)`, reads their `state`, `mergedBy`, the actor of their latest `ClosedEvent`, and the latest 20 comments of each of the first 100 review threads, with author login and `publishedAt`. It costs about 1 point per PR, measured. It does not run on the first poll or when no PR needs it.
 - A new poll does not start while the main query or the details query runs.
-- Polls every `refreshIntervalSec` seconds (default 10), plus a refresh when the popup opens.
+- Polls every `refreshIntervalSec` seconds (default 30), plus a refresh when the popup opens.
 - Setup: the user runs `gh auth login` once.
 
 ## Status rules
@@ -143,7 +143,7 @@ A gear button in the popup lets the user change the widget's settings without ed
 
 ### Refresh
 
-- `refreshIntervalSec`: a whole number of seconds, from 5 to 3600, default 10.
+- `refreshIntervalSec`: a whole number of seconds, from 5 to 3600, default 30.
 - A number field with up and down arrows that step by 5. A typed value outside the range is clamped to the nearest limit; a value that is not a number goes back to the saved value.
 - The poll timer uses the new interval right away.
 

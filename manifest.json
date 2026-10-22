@@ -19,7 +19,7 @@
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
-      "refreshIntervalSec": 10,
+      "refreshIntervalSec": 30,
       "authoredMaxAgeDays": 365,
       "toReviewMaxAgeDays": 365,
       "hideMyApprovedPrs": true,

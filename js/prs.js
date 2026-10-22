@@ -756,7 +756,7 @@ function wholeNumberInRange(value, min, max, fallback) {
 
 var REFRESH_INTERVAL_MIN_SEC = 5;
 var REFRESH_INTERVAL_MAX_SEC = 3600;
-var REFRESH_INTERVAL_DEFAULT_SEC = 10;
+var REFRESH_INTERVAL_DEFAULT_SEC = 30;
 
 /**
  * The `refreshIntervalSec` setting as whole seconds within the allowed range; the default when it is not a number.
@@ -827,6 +827,7 @@ if (typeof module !== "undefined") {
         settingOn: settingOn,
         REFRESH_INTERVAL_MIN_SEC: REFRESH_INTERVAL_MIN_SEC,
         REFRESH_INTERVAL_MAX_SEC: REFRESH_INTERVAL_MAX_SEC,
+        REFRESH_INTERVAL_DEFAULT_SEC: REFRESH_INTERVAL_DEFAULT_SEC,
         refreshIntervalSec: refreshIntervalSec,
         MAX_AGE_MIN_DAYS: MAX_AGE_MIN_DAYS,
         MAX_AGE_MAX_DAYS: MAX_AGE_MAX_DAYS,

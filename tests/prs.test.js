@@ -457,7 +457,7 @@ describe('tabs', () => {
 
 describe('refreshIntervalSec', () => {
   it('keeps a value inside the range', () => {
-    assert.equal(P.refreshIntervalSec(30), 30)
+    assert.equal(P.refreshIntervalSec(45), 45)
   })
 
   it('clamps to the allowed range', () => {
@@ -474,13 +474,13 @@ describe('refreshIntervalSec', () => {
   })
 
   it('falls back to the default for a value that is not a number', () => {
-    assert.equal(P.refreshIntervalSec('soon'), 10)
-    assert.equal(P.refreshIntervalSec(undefined), 10)
+    assert.equal(P.refreshIntervalSec('soon'), 30)
+    assert.equal(P.refreshIntervalSec(undefined), 30)
   })
 
   it('falls back to the default for null and an empty string', () => {
-    assert.equal(P.refreshIntervalSec(null), 10)
-    assert.equal(P.refreshIntervalSec(''), 10)
+    assert.equal(P.refreshIntervalSec(null), 30)
+    assert.equal(P.refreshIntervalSec(''), 30)
   })
 })
 
