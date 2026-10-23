@@ -16,7 +16,8 @@ Panel {
 
   readonly property string iconGithub: "" // nf-fa-github
   readonly property string iconError: "✕"
-  readonly property string iconAiReview: "󰚩" // nf-md-robot
+  readonly property string iconAiChangesSuggested: "󰚩" // nf-md-robot
+  readonly property string iconAiReviewClean: "󱙺" // nf-md-robot_outline
   readonly property string iconApproved: "󰗠" // nf-md-check_circle
   readonly property string iconChangesRequested: "󰷈" // nf-md-file_document_edit
   readonly property string iconUnresolvedThreads: "󰆂" // nf-md-comment_outline
@@ -27,9 +28,8 @@ Panel {
   readonly property string iconClosed: "󰅙" // nf-md-close_circle
   // Approved has no icon here because the approval count shows it.
   readonly property var reviewDecisionIcons: ({ CHANGES_REQUESTED: iconChangesRequested })
-  // A notification setting missing here uses the GitHub icon.
   readonly property var notificationIcons: ({
-    notifyAiReviewDone: iconAiReview, notifyApproved: iconApproved, notifyChangesRequested: iconChangesRequested,
+    notifyApproved: iconApproved, notifyChangesRequested: iconChangesRequested,
     notifyCodeComments: iconUnresolvedThreads, notifyMerged: iconMerged, notifyClosed: iconClosed
   })
 
@@ -78,6 +78,18 @@ Panel {
     return reviewDecisionIcons[decision] || ""
   }
 
+  // Empty while the AI review is not done.
+  function aiReviewIcon(pr) {
+    if (pr.aiChangesSuggested) return iconAiChangesSuggested
+    return pr.aiReviewClean ? iconAiReviewClean : ""
+  }
+
+  // An AI review notification shows its result's icon; a setting missing from notificationIcons uses the GitHub icon.
+  function notificationIcon(notification) {
+    if (notification.setting === "notifyAiReviewDone") return aiReviewIcon(notification.pr)
+    return notificationIcons[notification.setting] || iconGithub
+  }
+
   function refresh() {
     if (fetchProc.running || detailsProc.running) return
     themeFile.reload()
@@ -123,7 +135,7 @@ Panel {
     var pr = notification.pr
     Util.execArgv([
       "omarchy-notification-send", "--app-name", "GitHub PRs",
-      "-g", root.notificationIcons[notification.setting] || root.iconGithub,
+      "-g", root.notificationIcon(notification),
       notification.title, pr.repo + "#" + pr.number + " — " + pr.title,
       "--exec", "xdg-open", pr.url
     ])
@@ -333,8 +345,8 @@ Panel {
               }
 
               RowIcon {
-                visible: row.modelData.aiChangesSuggested
-                text: root.iconAiReview
+                visible: text !== ""
+                text: root.aiReviewIcon(row.modelData)
               }
 
               RowIcon {

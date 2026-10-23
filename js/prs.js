@@ -65,6 +65,7 @@
  * @property {Status} status
  * @property {boolean} aiReviewDone
  * @property {boolean} aiChangesSuggested The AI review is done and an AI thread is unresolved.
+ * @property {boolean} aiReviewClean The AI review is done and no AI thread is unresolved.
  * @property {?ReviewDecision} reviewDecision Null when the repo requires no review.
  * @property {number} unresolvedThreadCount
  * @property {number} approvalCount Number of Approvals.
@@ -414,6 +415,7 @@ function toPullRequest(node, aiCheckPatterns, teams) {
         status: prStatus(checks),
         aiReviewDone: isAiReviewDone,
         aiChangesSuggested: isAiReviewDone && hasAiThread,
+        aiReviewClean: isAiReviewDone && !hasAiThread,
         reviewDecision: node.reviewDecision,
         unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length,
         approvalCount: latestReviews.filter(isApproval).length,

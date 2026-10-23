@@ -24,7 +24,9 @@
 
 **AI thread**: an Unresolved thread whose first comment is from an AI reviewer. _Avoid_: AI comment, AI suggestion.
 
-**AI changes suggested**: a PR whose AI review is done and that has at least one AI thread. The robot icon marks these PRs. _Avoid_: AI requested changes, AI review failed.
+**AI changes suggested**: a PR whose AI review is done and that has at least one AI thread. _Avoid_: AI requested changes, AI review failed.
+
+**AI review clean**: a PR whose AI review is done and that has no AI thread. A PR with AI changes suggested becomes AI review clean when it no longer has an AI thread. _Avoid_: AI approved, AI passed.
 
 **Status**: the CI state of a Check or a PR. One of `failing`, `running`, `passing`, or `none`. A PR's Status is the worst Status among its Checks; `none` means it has no Checks. _Avoid_: state, result, color.
 

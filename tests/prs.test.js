@@ -84,6 +84,7 @@ describe('parseRun success', () => {
         status: 'failing',
         aiReviewDone: false,
         aiChangesSuggested: false,
+        aiReviewClean: false,
         reviewDecision: 'APPROVED',
         unresolvedThreadCount: 0,
         approvalCount: 0,
@@ -395,6 +396,22 @@ describe('parseRun AI changes suggested', () => {
   it('uses the same rule for PRs to review', () => {
     const result = P.parseRun(0, response([], [aiReviewedNode([thread(false, 'coderabbitai')])]), '', 'CodeRabbit')
     assert.equal(result.prsToReview[0].aiChangesSuggested, true)
+  })
+})
+
+const aiReviewCleanFor = (node) => P.parseRun(0, response([node]), '', 'CodeRabbit').prs[0].aiReviewClean
+
+describe('parseRun AI review clean', () => {
+  it('is true when the AI review is done without AI threads', () => {
+    assert.equal(aiReviewCleanFor(aiReviewedNode([thread(false, 'ana'), thread(true, 'coderabbitai')])), true)
+  })
+
+  it('is false when an AI thread is unresolved', () => {
+    assert.equal(aiReviewCleanFor(aiReviewedNode([thread(false, 'coderabbitai')])), false)
+  })
+
+  it('waits for the AI review to be done', () => {
+    assert.equal(aiReviewCleanFor(aiReviewedNode([], [ctx('PENDING', 'CodeRabbit')])), false)
   })
 })
 
