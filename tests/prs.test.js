@@ -173,6 +173,25 @@ describe('errorMessage', () => {
   it('falls back to the exit code when gh printed nothing', () => {
     assert.equal(P.errorMessage('', 2), 'gh exited with code 2')
   })
+
+  it('names the rate limit', () => {
+    assert.equal(P.errorMessage('gh: API rate limit exceeded for user ID 42879297.\n', 1), P.RATE_LIMIT_ERROR)
+  })
+})
+
+describe('rateLimitMessage', () => {
+  it('adds the local time the limit resets', () => {
+    const resetSec = new Date(2026, 9, 23, 9, 5).getTime() / 1000
+    assert.equal(P.rateLimitMessage(0, resetSec + '\n'), 'GitHub rate limit reached. Resumes at 09:05')
+  })
+
+  it('leaves the time out when gh failed', () => {
+    assert.equal(P.rateLimitMessage(1, ''), 'GitHub rate limit reached')
+  })
+
+  it('leaves the time out when gh printed no number', () => {
+    assert.equal(P.rateLimitMessage(0, 'null\n'), 'GitHub rate limit reached')
+  })
 })
 
 const withChecks = (checks) => prNode({ commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: checks } } } }] } })
@@ -354,64 +373,113 @@ describe('parseRun unresolved threads', () => {
   })
 })
 
-const aiReviewedNode = (threads, checks = [ctx('SUCCESS', 'CodeRabbit')]) => Object.assign(withChecks(checks), { reviewThreads: { nodes: threads } })
-const aiChangesSuggestedFor = (threads, aiCheckNames = 'CodeRabbit') =>
-  P.parseRun(0, response([aiReviewedNode(threads)]), '', aiCheckNames).prs[0].aiChangesSuggested
+const aiThreadsResponse = (threads, id = 'PR_7') => JSON.stringify({ data: { nodes: [{ id, reviewThreads: { nodes: threads } }] } })
+const aiThreadPrIdsFor = (threads, aiCheckNames = 'CodeRabbit') =>
+  P.parseAiThreadsRun(0, aiThreadsResponse(threads), '', aiCheckNames).prIds
 
-describe('parseRun AI changes suggested', () => {
-  it('is true for an unresolved AI thread', () => {
-    assert.equal(aiChangesSuggestedFor([thread(true), thread(false, 'coderabbitai')]), true)
+describe('parseAiThreadsRun', () => {
+  it('lists a PR with an unresolved AI thread', () => {
+    assert.deepEqual(aiThreadPrIdsFor([thread(true), thread(false, 'coderabbitai')]), ['PR_7'])
   })
 
   it('ignores resolved AI threads', () => {
-    assert.equal(aiChangesSuggestedFor([thread(true, 'coderabbitai')]), false)
+    assert.deepEqual(aiThreadPrIdsFor([thread(true, 'coderabbitai')]), [])
   })
 
   it('ignores threads started by humans', () => {
-    assert.equal(aiChangesSuggestedFor([thread(false, 'ana'), thread(false, 'bob')]), false)
+    assert.deepEqual(aiThreadPrIdsFor([thread(false, 'ana'), thread(false, 'bob')]), [])
   })
 
   it('ignores an AI reply to a human thread', () => {
     const humanThread = { isResolved: false, comments: { nodes: [commentNode('ana'), commentNode('coderabbitai')] } }
-    assert.equal(aiChangesSuggestedFor([humanThread]), false)
-  })
-
-  it('waits for the AI review to be done', () => {
-    const node = aiReviewedNode([thread(false, 'coderabbitai')], [ctx('PENDING', 'CodeRabbit')])
-    assert.equal(P.parseRun(0, response([node]), '', 'CodeRabbit').prs[0].aiChangesSuggested, false)
+    assert.deepEqual(aiThreadPrIdsFor([humanThread]), [])
   })
 
   it('matches logins ignoring case', () => {
-    assert.equal(aiChangesSuggestedFor([thread(false, 'CodeRabbitAI')], 'coderabbit'), true)
+    assert.deepEqual(aiThreadPrIdsFor([thread(false, 'CodeRabbitAI')], 'coderabbit'), ['PR_7'])
   })
 
   it('is off without AI check patterns', () => {
-    assert.equal(aiChangesSuggestedFor([thread(false, 'coderabbitai')], ''), false)
+    assert.deepEqual(aiThreadPrIdsFor([thread(false, 'coderabbitai')], ''), [])
   })
 
   it('ignores a thread started by a deleted account', () => {
-    assert.equal(aiChangesSuggestedFor([thread(false, null)]), false)
+    assert.deepEqual(aiThreadPrIdsFor([thread(false, null)]), [])
   })
 
-  it('uses the same rule for PRs to review', () => {
-    const result = P.parseRun(0, response([], [aiReviewedNode([thread(false, 'coderabbitai')])]), '', 'CodeRabbit')
-    assert.equal(result.prsToReview[0].aiChangesSuggested, true)
+  it('reports a gh failure', () => {
+    assert.deepEqual(P.parseAiThreadsRun(1, '', 'gh: Could not resolve to a node\n', 'CodeRabbit'),
+      { prIds: [], error: 'gh: Could not resolve to a node' })
+  })
+
+  it('reports a broken response', () => {
+    assert.equal(P.parseAiThreadsRun(0, '{"data":{}}', '', 'CodeRabbit').error, 'Unexpected response from gh')
   })
 })
 
-const aiReviewCleanFor = (node) => P.parseRun(0, response([node]), '', 'CodeRabbit').prs[0].aiReviewClean
+const aiReviewedNode = (threads, checks = [ctx('SUCCESS', 'CodeRabbit')]) => Object.assign(withChecks(checks), { reviewThreads: { nodes: threads } })
+const pollOf = (node, toReviewNodes = []) => P.parseRun(0, response([node], toReviewNodes), '', 'CodeRabbit')
 
-describe('parseRun AI review clean', () => {
-  it('is true when the AI review is done without AI threads', () => {
-    assert.equal(aiReviewCleanFor(aiReviewedNode([thread(false, 'ana'), thread(true, 'coderabbitai')])), true)
+describe('prIdsNeedingAiThreads', () => {
+  it('lists PRs whose AI review is done and that have an unresolved thread', () => {
+    assert.deepEqual(P.prIdsNeedingAiThreads(pollOf(aiReviewedNode([thread(true), thread(false)]))), ['PR_7'])
   })
 
-  it('is false when an AI thread is unresolved', () => {
-    assert.equal(aiReviewCleanFor(aiReviewedNode([thread(false, 'coderabbitai')])), false)
+  it('skips PRs without unresolved threads', () => {
+    assert.deepEqual(P.prIdsNeedingAiThreads(pollOf(aiReviewedNode([thread(true)]))), [])
+  })
+
+  it('skips PRs whose AI review is not done', () => {
+    assert.deepEqual(P.prIdsNeedingAiThreads(pollOf(aiReviewedNode([thread(false)], [ctx('PENDING', 'CodeRabbit')]))), [])
+  })
+
+  it('includes PRs to review', () => {
+    const toReview = Object.assign(aiReviewedNode([thread(false)]), { id: 'PR_8' })
+    assert.deepEqual(P.prIdsNeedingAiThreads(pollOf(aiReviewedNode([]), [toReview])), ['PR_8'])
+  })
+})
+
+const aiResultFor = (node, aiThreadPrIds) => P.withAiThreads(pollOf(node), aiThreadPrIds).prs[0]
+
+describe('withAiThreads AI changes suggested', () => {
+  it('is true for a PR with an AI thread', () => {
+    assert.equal(aiResultFor(aiReviewedNode([thread(false)]), ['PR_7']).aiChangesSuggested, true)
+  })
+
+  it('is false for a PR without an AI thread', () => {
+    assert.equal(aiResultFor(aiReviewedNode([thread(false)]), ['PR_9']).aiChangesSuggested, false)
   })
 
   it('waits for the AI review to be done', () => {
-    assert.equal(aiReviewCleanFor(aiReviewedNode([], [ctx('PENDING', 'CodeRabbit')])), false)
+    const node = aiReviewedNode([thread(false)], [ctx('PENDING', 'CodeRabbit')])
+    assert.equal(aiResultFor(node, ['PR_7']).aiChangesSuggested, false)
+  })
+
+  it('uses the same rule for PRs to review', () => {
+    const poll = P.withAiThreads(pollOf(aiReviewedNode([]), [aiReviewedNode([thread(false)])]), ['PR_7'])
+    assert.equal(poll.prsToReview[0].aiChangesSuggested, true)
+  })
+})
+
+describe('withAiThreads AI review clean', () => {
+  it('is true when the AI review is done without AI threads', () => {
+    assert.equal(aiResultFor(aiReviewedNode([thread(false, 'ana')]), []).aiReviewClean, true)
+  })
+
+  it('is false when the PR has an AI thread', () => {
+    assert.equal(aiResultFor(aiReviewedNode([thread(false)]), ['PR_7']).aiReviewClean, false)
+  })
+
+  it('waits for the AI review to be done', () => {
+    assert.equal(aiResultFor(aiReviewedNode([], [ctx('PENDING', 'CodeRabbit')]), []).aiReviewClean, false)
+  })
+})
+
+describe('parseRun AI review result', () => {
+  it('counts every PR as having no AI thread', () => {
+    const pr = pollOf(aiReviewedNode([thread(false, 'coderabbitai')])).prs[0]
+    assert.equal(pr.aiChangesSuggested, false)
+    assert.equal(pr.aiReviewClean, true)
   })
 })
 
@@ -445,8 +513,12 @@ describe('QUERY', () => {
     assert.match(P.QUERY, /reviewThreads\(first: 100\)[^}]*\bisResolved\b/)
   })
 
-  it('reads who started each review thread', () => {
-    assert.match(P.QUERY, /reviewThreads\(first: 100\) \{ nodes \{ isResolved comments\(first: 1\) \{ nodes \{ author \{ login \} \} \} \} \}/)
+  it('skips who started each review thread, which costs the most', () => {
+    assert.match(P.QUERY, /reviewThreads\(first: 100\) \{ nodes \{ isResolved \} \}/)
+  })
+
+  it('leaves who started each review thread to AI_THREADS_QUERY', () => {
+    assert.match(P.AI_THREADS_QUERY, /PullRequest \{ id reviewThreads\(first: 100\) \{ nodes \{ isResolved comments\(first: 1\) \{ nodes \{ author \{ login \} \} \} \} \}/)
   })
 
   it('reads each reviewer\'s latest review', () => {
@@ -906,9 +978,9 @@ describe('prIdsNeedingDetails', () => {
   })
 })
 
-describe('detailsCommand', () => {
+describe('nodesCommand', () => {
   it('passes each PR id as an item of the ids variable', () => {
-    assert.deepEqual(P.detailsCommand(['PR_1', 'PR_2']),
+    assert.deepEqual(P.nodesCommand(P.DETAILS_QUERY, ['PR_1', 'PR_2']),
       ['gh', 'api', 'graphql', '-f', 'query=' + P.DETAILS_QUERY, '-f', 'ids[]=PR_1', '-f', 'ids[]=PR_2'])
   })
 })

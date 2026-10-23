@@ -45,6 +45,8 @@ Panel {
   property real now: 0
   // PRs the next poll's notifications compare against.
   property var lastPrs: null
+  // The successful main poll that waits for its AI threads query.
+  property var pendingAiThreadsPoll: null
   // The successful main poll that waits for its details query.
   property var pendingPoll: null
   property string error: ""
@@ -91,7 +93,7 @@ Panel {
   }
 
   function refresh() {
-    if (fetchProc.running || detailsProc.running) return
+    if (fetchProc.running || aiThreadsProc.running || detailsProc.running) return
     themeFile.reload()
     fetchProc.running = true
   }
@@ -108,6 +110,7 @@ Panel {
     if (aiCheckNames === Prs.joinAiCheckPatterns(Prs.parseAiCheckPatterns(root.aiCheckNames))) return
     saveSettings({ aiCheckNames: aiCheckNames })
     root.lastPrs = null
+    root.pendingAiThreadsPoll = null
     root.pendingPoll = null
     refresh()
   }
@@ -141,6 +144,29 @@ Panel {
     ])
   }
 
+  // Shows the PRs of a successful poll, then sends its notifications once the details of changed PRs arrive.
+  function applyPoll(result) {
+    root.lastPollTime = Date.now()
+    root.prs = result.prs
+    root.prsToReview = result.prsToReview
+    root.viewerLogin = result.viewerLogin
+    root.error = ""
+    var ids = Prs.prIdsNeedingDetails(root.lastPrs, result.prs)
+    if (ids.length > 0) {
+      root.pendingPoll = result
+      detailsProc.command = Prs.nodesCommand(Prs.DETAILS_QUERY, ids)
+      detailsProc.running = true
+    } else {
+      root.finishPoll(result, null)
+    }
+  }
+
+  // A failed poll keeps the PRs from the Last refresh; a rate limit error gets its reset time.
+  function failPoll(error) {
+    root.error = error
+    if (error === Prs.RATE_LIMIT_ERROR) rateLimitProc.running = true
+  }
+
   // Sends the poll's notifications and keeps its PRs for the next poll.
   function finishPoll(poll, details) {
     Prs.pollNotifications(root.lastPrs, poll.prs, details, poll.viewerLogin).forEach(root.notify)
@@ -165,22 +191,44 @@ Panel {
     onExited: function(exitCode) {
       var result = Prs.parseRun(exitCode, String(fetchStdout.text), String(fetchStderr.text),
                                 root.aiCheckNames)
-      // A failed poll keeps the PRs from the Last refresh.
-      if (result.error === "") {
-        root.lastPollTime = Date.now()
-        root.prs = result.prs
-        root.prsToReview = result.prsToReview
-        root.viewerLogin = result.viewerLogin
-        var ids = Prs.prIdsNeedingDetails(root.lastPrs, result.prs)
-        if (ids.length > 0) {
-          root.pendingPoll = result
-          detailsProc.command = Prs.detailsCommand(ids)
-          detailsProc.running = true
-        } else {
-          root.finishPoll(result, null)
-        }
+      if (result.error !== "") {
+        root.failPoll(result.error)
+        return
       }
-      root.error = result.error
+      var ids = Prs.prIdsNeedingAiThreads(result)
+      if (ids.length > 0) {
+        root.pendingAiThreadsPoll = result
+        aiThreadsProc.command = Prs.nodesCommand(Prs.AI_THREADS_QUERY, ids)
+        aiThreadsProc.running = true
+      } else {
+        root.applyPoll(result)
+      }
+    }
+  }
+
+  Process {
+    id: aiThreadsProc
+    stdout: StdioCollector { id: aiThreadsStdout; waitForEnd: true }
+    stderr: StdioCollector { id: aiThreadsStderr; waitForEnd: true }
+    onExited: function(exitCode) {
+      var result = Prs.parseAiThreadsRun(exitCode, String(aiThreadsStdout.text), String(aiThreadsStderr.text),
+                                         root.aiCheckNames)
+      var poll = root.pendingAiThreadsPoll
+      root.pendingAiThreadsPoll = null
+      // A pending poll cleared by a pattern change is dropped.
+      if (!poll) return
+      if (result.error !== "") root.failPoll(result.error)
+      else root.applyPoll(Prs.withAiThreads(poll, result.prIds))
+    }
+  }
+
+  Process {
+    id: rateLimitProc
+    command: Prs.RATE_LIMIT_RESET_COMMAND
+    stdout: StdioCollector { id: rateLimitStdout; waitForEnd: true }
+    onExited: function(exitCode) {
+      // A poll that succeeded meanwhile already cleared the error.
+      if (root.error === Prs.RATE_LIMIT_ERROR) root.error = Prs.rateLimitMessage(exitCode, String(rateLimitStdout.text))
     }
   }
 

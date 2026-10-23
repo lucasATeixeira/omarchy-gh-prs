@@ -357,19 +357,23 @@ function tabs(authoredPrs, prsToReview, showCounts) {
     ];
 }
 
-/** GraphQL query for the viewer's teams and the 50 most recently updated Authored PRs and PRs to review, with the fields each row shows. */
+/**
+ * GraphQL query for the viewer's teams and the 50 most recently updated Authored PRs and PRs to review, with the fields each row shows.
+ * It skips who started each review thread because GitHub charges that per thread of every PR; AI_THREADS_QUERY reads it only where needed.
+ */
 var QUERY = "query { viewer { login organizations(first: 100) { nodes { teams(first: 100, role: MEMBER) { nodes { combinedSlug } } } } }"
     + " authoredPrs: search(query: \"is:pr is:open author:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } }"
     + " prsToReview: search(query: \"is:pr is:open review-requested:@me sort:updated-desc\", type: ISSUE, first: 50) { nodes { ...PrFields } } }"
     + " fragment PrFields on PullRequest { id number title url isDraft createdAt updatedAt author { login } reviewDecision mergeable repository { nameWithOwner }"
     + " timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 20) { nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer { ... on User { isViewer } ... on Team { combinedSlug } } } } }"
-    + " reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login } } } } }"
+    + " reviewThreads(first: 100) { nodes { isResolved } }"
     + " latestReviews(first: 20) { nodes { id state author { login } } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
     + " __typename ... on CheckRun { name status conclusion databaseId checkSuite { workflowRun { workflow { name } } } } ... on StatusContext { context state } } } } } } } }";
 
 /**
  * Turns one `gh api graphql` run with QUERY into the PRs to show, or an error.
+ * Every PR counts as having no AI thread until withAiThreads.
  * @param {number} exitCode
  * @param {string} stdout
  * @param {string} stderr
@@ -385,12 +389,12 @@ function parseRun(exitCode, stdout, stderr, aiCheckNames) {
         var toPullRequests = function (search) {
             return search.nodes.map(function (node) { return toPullRequest(node, patterns, teams); });
         };
-        return {
+        return withAiThreads({
             prs: toPullRequests(data.authoredPrs),
             prsToReview: toPullRequests(data.prsToReview),
             viewerLogin: data.viewer.login,
             error: ""
-        };
+        }, []);
     } catch (e) {
         return { prs: [], prsToReview: [], error: "Unexpected response from gh" };
     }
@@ -400,8 +404,6 @@ function toPullRequest(node, aiCheckPatterns, teams) {
     var rollup = node.commits.nodes[0].commit.statusCheckRollup;
     var checks = rollup ? latestChecks(rollup.contexts.nodes) : [];
     var latestReviews = node.latestReviews.nodes.map(toReview);
-    var isAiReviewDone = aiReviewDone(checks, aiCheckPatterns);
-    var hasAiThread = node.reviewThreads.nodes.some(function (thread) { return isAiThread(thread, aiCheckPatterns); });
     return {
         id: node.id,
         repo: node.repository.nameWithOwner,
@@ -413,15 +415,73 @@ function toPullRequest(node, aiCheckPatterns, teams) {
         reviewRequestedAt: latestReviewRequestAt(node.timelineItems.nodes, teams) || node.createdAt,
         author: userLogin(node.author),
         status: prStatus(checks),
-        aiReviewDone: isAiReviewDone,
-        aiChangesSuggested: isAiReviewDone && hasAiThread,
-        aiReviewClean: isAiReviewDone && !hasAiThread,
+        aiReviewDone: aiReviewDone(checks, aiCheckPatterns),
         reviewDecision: node.reviewDecision,
         unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length,
         approvalCount: latestReviews.filter(isApproval).length,
         hasConflict: node.mergeable === "CONFLICTING",
         latestReviews: latestReviews
     };
+}
+
+/**
+ * Ids of the PRs whose AI threads AI_THREADS_QUERY must read: their AI review is done and they have an Unresolved thread.
+ * @param {FetchResult} result
+ * @returns {string[]}
+ */
+function prIdsNeedingAiThreads(result) {
+    return result.prs.concat(result.prsToReview)
+        .filter(function (pr) { return pr.aiReviewDone && pr.unresolvedThreadCount > 0; })
+        .map(function (pr) { return pr.id; });
+}
+
+/**
+ * The poll with each PR's AI review result.
+ * @param {FetchResult} result
+ * @param {string[]} aiThreadPrIds Ids of the PRs with an AI thread.
+ * @returns {FetchResult}
+ */
+function withAiThreads(result, aiThreadPrIds) {
+    var addResult = function (pr) {
+        var hasAiThread = aiThreadPrIds.indexOf(pr.id) !== -1;
+        return Object.assign({}, pr, {
+            aiChangesSuggested: pr.aiReviewDone && hasAiThread,
+            aiReviewClean: pr.aiReviewDone && !hasAiThread
+        });
+    };
+    return Object.assign({}, result, { prs: result.prs.map(addResult), prsToReview: result.prsToReview.map(addResult) });
+}
+
+/**
+ * The outcome of one AI threads run; `error` is empty on success.
+ * @typedef {Object} AiThreadsResult
+ * @property {string[]} prIds Ids of the PRs with an AI thread.
+ * @property {string} error
+ */
+
+/** GraphQL query for who started each review thread of the PRs in `$ids`. */
+var AI_THREADS_QUERY = "query($ids: [ID!]!) { nodes(ids: $ids) { ... on PullRequest { id"
+    + " reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login } } } } } } } }";
+
+/**
+ * Turns one `gh api graphql` run with AI_THREADS_QUERY into the PRs with an AI thread, or an error.
+ * @param {number} exitCode
+ * @param {string} stdout
+ * @param {string} stderr
+ * @param {string} aiCheckNames The `aiCheckNames` setting.
+ * @returns {AiThreadsResult}
+ */
+function parseAiThreadsRun(exitCode, stdout, stderr, aiCheckNames) {
+    if (exitCode !== 0) return { prIds: [], error: errorMessage(stderr, exitCode) };
+    try {
+        var patterns = aiCheckPatterns(aiCheckNames);
+        var prIds = JSON.parse(stdout).data.nodes
+            .filter(function (node) { return node.reviewThreads.nodes.some(function (thread) { return isAiThread(thread, patterns); }); })
+            .map(function (node) { return node.id; });
+        return { prIds: prIds, error: "" };
+    } catch (e) {
+        return { prIds: [], error: "Unexpected response from gh" };
+    }
 }
 
 /**
@@ -544,12 +604,13 @@ var DETAILS_QUERY = "query($ids: [ID!]!) { nodes(ids: $ids) { ... on PullRequest
     + " reviewThreads(first: 100) { nodes { comments(last: 20) { nodes { publishedAt author { login } } } } } } } }";
 
 /**
- * The `gh` command that runs DETAILS_QUERY for these PR ids.
+ * The `gh` command that runs a query with an `$ids` variable, such as DETAILS_QUERY, for these PR ids.
+ * @param {string} query
  * @param {string[]} ids
  * @returns {string[]}
  */
-function detailsCommand(ids) {
-    var command = ["gh", "api", "graphql", "-f", "query=" + DETAILS_QUERY];
+function nodesCommand(query, ids) {
+    var command = ["gh", "api", "graphql", "-f", "query=" + query];
     ids.forEach(function (id) { command.push("-f", "ids[]=" + id); });
     return command;
 }
@@ -748,6 +809,11 @@ function prIdsNeedingDetails(previousPrs, currentPrs) {
     return missingSincePoll(previousPrs, currentPrs).concat(updated).map(function (pr) { return pr.id; });
 }
 
+var RATE_LIMIT_ERROR = "GitHub rate limit reached";
+
+/** The `gh` command that prints when the GraphQL rate limit resets, in seconds since the epoch. */
+var RATE_LIMIT_RESET_COMMAND = ["gh", "api", "rate_limit", "--jq", ".resources.graphql.reset"];
+
 /**
  * Turns a failed `gh` run into a message for the panel; auth failures get a login hint.
  * @param {string} stderr
@@ -756,7 +822,22 @@ function prIdsNeedingDetails(previousPrs, currentPrs) {
  */
 function errorMessage(stderr, exitCode) {
     if (stderr.indexOf("gh auth login") !== -1) return "Not logged in to GitHub. Run: gh auth login";
+    if (stderr.indexOf("API rate limit exceeded") !== -1) return RATE_LIMIT_ERROR;
     return stderr.trim() || "gh exited with code " + exitCode;
+}
+
+/**
+ * The rate limit error with the local time it resets, from one RATE_LIMIT_RESET_COMMAND run; without the time when the run failed.
+ * @param {number} exitCode
+ * @param {string} stdout
+ * @returns {string}
+ */
+function rateLimitMessage(exitCode, stdout) {
+    var text = stdout.trim();
+    if (exitCode !== 0 || text === "" || isNaN(Number(text))) return RATE_LIMIT_ERROR;
+    var reset = new Date(Number(text) * 1000);
+    var twoDigits = function (n) { return (n < 10 ? "0" : "") + n; };
+    return RATE_LIMIT_ERROR + ". Resumes at " + twoDigits(reset.getHours()) + ":" + twoDigits(reset.getMinutes());
 }
 
 /**
@@ -896,7 +977,11 @@ if (typeof module !== "undefined") {
         pollNotifications: pollNotifications,
         prIdsNeedingDetails: prIdsNeedingDetails,
         DETAILS_QUERY: DETAILS_QUERY,
-        detailsCommand: detailsCommand,
+        nodesCommand: nodesCommand,
+        AI_THREADS_QUERY: AI_THREADS_QUERY,
+        prIdsNeedingAiThreads: prIdsNeedingAiThreads,
+        withAiThreads: withAiThreads,
+        parseAiThreadsRun: parseAiThreadsRun,
         parseDetailsRun: parseDetailsRun,
         notificationEnabled: notificationEnabled,
         settingOn: settingOn,
@@ -919,6 +1004,8 @@ if (typeof module !== "undefined") {
         sections: sections,
         tabs: tabs,
         errorMessage: errorMessage,
+        RATE_LIMIT_ERROR: RATE_LIMIT_ERROR,
+        rateLimitMessage: rateLimitMessage,
         DEFAULT_COLORS: DEFAULT_COLORS,
         themeColors: themeColors
     };
