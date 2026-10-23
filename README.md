@@ -4,7 +4,7 @@ An Omarchy bar widget that shows the CI status of your open GitHub pull requests
 
 The bar shows the GitHub icon with a badge: the worst CI status among your PRs and how many PRs have it. Red means a check failed, yellow means checks are still running, and green means every check passed. Click it to see your PRs grouped into Failing, Running, Passing, and No CI. Click a PR to open it in the browser.
 
-The popup has two tabs. **Authored** lists the PRs you opened. **To review** lists the open PRs that wait for your review, asked from you or from one of your teams, and shows who opened each one. Press `h`/`l` or Left/Right to switch tabs. The badge and the notifications only count your authored PRs. Under the title, a small label says how long ago the PRs were last refreshed, for example "Refreshed 3 min ago".
+The popup has two tabs. **Authored** lists the PRs you opened. **To review** lists the open PRs that wait for your review, asked from you or from one of your teams, and shows who opened each one. Press `h`/`l` or Left/Right to switch tabs. The badge and the notifications only count your authored PRs. Under the title, a small label says how long ago the PRs were last refreshed, for example "Refreshed 3 min ago". It says "Refreshing…" while a poll runs. Click the refresh button in the header, or press `r`, to poll GitHub right away.
 
 When a PR's checks stop running and pass or fail, you get a notification. You also get one when a reviewer approves a PR or requests changes, when someone else writes new code comments, and when someone else merges or closes your PR. Click it to open the PR. Each notification can be turned off in Settings.
 
@@ -63,5 +63,3 @@ Click the gear in the popup header to change the settings. Changes apply right a
 
 The spec lives in `.agent/scratch/gh-prs/spec.md`, and the domain terms are defined in `.agent/GLOSSARY.md`.
 
-# Ideas
-- Add a refresh button

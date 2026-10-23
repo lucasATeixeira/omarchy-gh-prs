@@ -24,6 +24,7 @@ Panel {
   readonly property string iconConflict: "󰀦" // nf-md-alert
   readonly property string iconSettings: "󰒓" // nf-md-cog
   readonly property string iconBack: "󰁍" // nf-md-arrow_left
+  readonly property string iconRefresh: "󰑐" // nf-md-refresh
   readonly property string iconMerged: "󰘭" // nf-md-source_merge
   readonly property string iconClosed: "󰅙" // nf-md-close_circle
   // Approved has no icon here because the approval count shows it.
@@ -68,6 +69,8 @@ Panel {
   readonly property string badgeStatus: error !== "" ? "failing" : summary.status
   readonly property string badgeLabel: error !== "" ? iconError : String(summary.count)
   readonly property bool hasLastRefresh: lastPollTime > 0
+  // A poll runs until its details query ends, even after its PRs show.
+  readonly property bool polling: fetchProc.running || aiThreadsProc.running || detailsProc.running
   readonly property var tabs: Prs.tabs(freshPrs, shownPrsToReview, hasLastRefresh)
   readonly property var currentTab: tabs[tabIndex]
 
@@ -93,7 +96,7 @@ Panel {
   }
 
   function refresh() {
-    if (fetchProc.running || aiThreadsProc.running || detailsProc.running) return
+    if (polling) return
     themeFile.reload()
     fetchProc.running = true
   }
@@ -541,6 +544,7 @@ Panel {
       anchors.fill: parent
       onCloseRequested: root.settingsOpen ? root.closeSettings() : root.close()
       onTabRequested: function(direction) { if (!root.settingsOpen) root.switchPanel(direction) }
+      onTextKey: function(text) { if (text === "r" && !root.settingsOpen) root.refresh() }
       // h/l and Left/Right select the next Tab on that side.
       onMoveRequested: function(dx, dy) {
         if (!root.settingsOpen && dx !== 0) root.selectTab(root.tabIndex + dx)
@@ -570,8 +574,8 @@ Panel {
             }
 
             Text {
-              visible: root.hasLastRefresh && !root.settingsOpen
-              text: Prs.refreshLabel(root.lastPollTime, root.now)
+              visible: (root.hasLastRefresh || root.polling) && !root.settingsOpen
+              text: Prs.refreshLabel(root.lastPollTime, root.now, root.polling)
               textFormat: Text.PlainText
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -590,6 +594,17 @@ Panel {
               visible: root.badgeStatus !== "none"
               status: root.badgeStatus
               label: root.badgeLabel
+            }
+
+            PanelActionButton {
+              anchors.verticalCenter: parent.verticalCenter
+              visible: !root.settingsOpen
+              enabled: !root.polling
+              iconText: root.iconRefresh
+              tooltipText: "Refresh"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              onClicked: root.refresh()
             }
 
             PanelActionButton {

@@ -711,6 +711,11 @@ describe('refreshLabel', () => {
     assert.equal(after(24 * 60 * 60), 'Refreshed 1 d ago')
     assert.equal(after(3 * 24 * 60 * 60 + 5 * 60 * 60), 'Refreshed 3 d ago')
   })
+
+  it('says refreshing while polling', () => {
+    assert.equal(P.refreshLabel(lastRefresh, lastRefresh + 5 * 60 * 1000, true), 'Refreshing…')
+    assert.equal(P.refreshLabel(0, lastRefresh, true), 'Refreshing…')
+  })
 })
 
 describe('withoutMyApprovedPrs', () => {

@@ -265,12 +265,14 @@ function withoutStalePrs(prs, maxAgeDays, now, ageStart) {
 }
 
 /**
- * Says how long before `now` the Last refresh was, rounding down.
+ * Says how long before `now` the Last refresh was, rounding down, or that a poll runs.
  * @param {number} lastRefresh Milliseconds since the epoch.
  * @param {number} now Milliseconds since the epoch.
+ * @param {boolean} [polling]
  * @returns {string}
  */
-function refreshLabel(lastRefresh, now) {
+function refreshLabel(lastRefresh, now, polling) {
+    if (polling) return "Refreshing…";
     var minutes = Math.floor((now - lastRefresh) / MS_PER_MINUTE);
     if (minutes < 1) return "Refreshed just now";
     if (minutes < 60) return "Refreshed " + minutes + " min ago";
