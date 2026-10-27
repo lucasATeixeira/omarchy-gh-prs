@@ -9,10 +9,27 @@ An Omarchy bar widget for your open GitHub pull requests: their CI status, revie
 - The bar shows the GitHub icon with a badge. The badge has the worst CI status among your PRs and how many PRs have it: red when a check failed, yellow while checks run, green when every check passed.
 - Click the icon to open a popup with your PRs grouped into Failing, Running, Passing, and No CI. Click a PR to open it in the browser.
 - The **Authored** tab lists the PRs you opened. The **To review** tab lists open PRs that wait for your review, asked from you or from one of your teams, with who opened each one. Press `h`/`l` or Left/Right to switch tabs. The badge and the notifications count only your authored PRs.
-- Each row shows the number of approvals, a mark when changes are requested, the number of unresolved review threads, and an alert when the PR has merge conflicts.
-- A robot icon shows the AI review result. It is filled while a thread started by an AI reviewer is unresolved, and an outline when the AI review is clean. See `aiCheckNames` below.
+- Each row has icons for approvals, change requests, unresolved review threads, merge conflicts, and the AI review. See [Icons](#icons).
 - Under the title, a label shows when the PRs were last refreshed, such as "Refreshed 3 min ago". Click the refresh button in the header, or press `r`, to poll GitHub now.
 - You get a notification when CI passes or fails, when a reviewer approves or requests changes, when someone else writes new code comments, when the AI review is done, and when someone else merges or closes your PR. Click it to open the PR. You can turn off each one in Settings.
+
+## Icons
+
+| Icon | Meaning |
+| --- | --- |
+| ![GitHub badge](assets/icons/github-badge.png) | In the bar: how many PRs have the worst CI status. The badge color is that status. |
+| ![Red dot](assets/icons/dot-failing.png) | Failing: a check failed. |
+| ![Yellow dot](assets/icons/dot-running.png) | Running: checks are still running. |
+| ![Green dot](assets/icons/dot-passing.png) | Passing: every check passed. |
+| ![Gray dot](assets/icons/dot-none.png) | No CI: the PR has no checks. |
+| ![Check](assets/icons/approved.png) | Number of approvals. |
+| ![Document with a pen](assets/icons/changes-requested.png) | A reviewer requested changes. |
+| ![Comment](assets/icons/unresolved-threads.png) | Number of unresolved review threads. |
+| ![Alert](assets/icons/conflict.png) | The PR has merge conflicts. |
+| ![Robot](assets/icons/robot.png) | The AI review is done, and a thread started by an AI reviewer is unresolved. See `aiCheckNames`. |
+| ![Robot outline](assets/icons/robot-outline.png) | The AI review is done, and no AI thread is unresolved. |
+| ![Refresh](assets/icons/refresh.png) | Poll GitHub now. You can also press `r`. |
+| ![Gear](assets/icons/settings.png) | Open the settings. |
 
 ## Requirements
 
