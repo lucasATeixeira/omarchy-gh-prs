@@ -18,9 +18,9 @@
 
 **AI check pattern**: a piece of text that the user chooses. Any Check whose name contains it, ignoring case, is an AI Check. Any user whose login contains it, ignoring case, is an AI reviewer. For example, `rabbit` matches the Check `CodeRabbit` and the user `coderabbitai`. With no patterns, there are no AI Checks and no AI reviewers. _Avoid_: AI check name.
 
-**AI reviewer**: the GitHub user that an AI code reviewer posts as, such as `coderabbitai`. _Avoid_: AI bot, bot.
+**AI reviewer**: the GitHub user or bot that an AI code reviewer posts as, such as `coderabbitai` or `copilot-pull-request-reviewer`. Some AI reviewers, such as Copilot, post Reviews but no Check. _Avoid_: AI bot, bot.
 
-**AI review done**: a PR whose latest commit has at least one AI Check, and every AI Check on it has finished, with any result. A new commit makes the PR not done again.
+**AI review done**: a PR with at least one AI Check on its latest commit or one Review from an AI reviewer, where every AI Check has finished, with any result, and no Review request to an AI reviewer is still waiting. A new commit makes the PR not done again while an AI Check runs on it. A new Review request to an AI reviewer makes it not done again until that AI reviewer posts a Review. An AI reviewer's verdict text does not matter.
 
 **AI thread**: an Unresolved thread whose first comment is from an AI reviewer. _Avoid_: AI comment, AI suggestion.
 

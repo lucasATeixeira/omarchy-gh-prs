@@ -55,6 +55,7 @@ const prNode = (overrides) => Object.assign({
   reviewDecision: 'APPROVED',
   reviewThreads: { nodes: [] },
   latestReviews: { nodes: [] },
+  reviewRequests: { nodes: [] },
   mergeable: 'MERGEABLE',
   repository: { nameWithOwner: 'acme/app' },
   commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [run('COMPLETED', 'FAILURE')] } } } }] }
@@ -222,6 +223,35 @@ describe('parseRun AI review', () => {
   it('is not done for a PR without a check rollup', () => {
     const node = prNode({ commits: { nodes: [{ commit: { statusCheckRollup: null } }] } })
     assert.equal(P.parseRun(0, response([node]), '', 'CodeRabbit').prs[0].aiReviewDone, false)
+  })
+})
+
+const copilot = 'copilot-pull-request-reviewer'
+const aiReviewDoneWith = (overrides, checks = [run('COMPLETED', 'SUCCESS')]) =>
+  P.parseRun(0, response([Object.assign(withChecks(checks), overrides)]), '', 'CodeRabbit, Copilot').prs[0].aiReviewDone
+const reviewedBy = (author) => ({ latestReviews: { nodes: [{ id: 'R1', state: 'COMMENTED', author: { login: author } }] } })
+const requested = (reviewer) => ({ reviewRequests: { nodes: [{ requestedReviewer: reviewer }] } })
+
+describe('parseRun AI review from an AI reviewer', () => {
+  it('is done when an AI reviewer posted a review, without an AI check', () => {
+    assert.equal(aiReviewDoneWith(reviewedBy(copilot)), true)
+  })
+
+  it('is not done for a review from a human', () => {
+    assert.equal(aiReviewDoneWith(reviewedBy('ana')), false)
+  })
+
+  it('waits while a review request to an AI reviewer is pending', () => {
+    assert.equal(aiReviewDoneWith(Object.assign(reviewedBy(copilot), requested({ login: copilot }))), false)
+  })
+
+  it('ignores pending review requests to people and teams', () => {
+    assert.equal(aiReviewDoneWith(Object.assign(reviewedBy(copilot), requested({}))), true)
+    assert.equal(aiReviewDoneWith(Object.assign(reviewedBy(copilot), requested(null))), true)
+  })
+
+  it('waits for a running AI check even after an AI reviewer posted', () => {
+    assert.equal(aiReviewDoneWith(reviewedBy(copilot), [run('IN_PROGRESS', null, 'CodeRabbit')]), false)
   })
 })
 
@@ -523,6 +553,10 @@ describe('QUERY', () => {
 
   it('reads each reviewer\'s latest review', () => {
     assert.match(P.QUERY, /latestReviews\(first: 20\) \{ nodes \{ id state author \{ login \} \} \}/)
+  })
+
+  it('reads which bots a review request is pending for', () => {
+    assert.match(P.QUERY, /reviewRequests\(first: 20\) \{ nodes \{ requestedReviewer \{ \.\.\. on Bot \{ login \} \} \} \}/)
   })
 
   it('reads whether the PR can merge', () => {

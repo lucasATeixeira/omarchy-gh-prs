@@ -23,7 +23,7 @@
       "authoredMaxAgeDays": 365,
       "toReviewMaxAgeDays": 365,
       "hideMyApprovedPrs": true,
-      "aiCheckNames": "CodeRabbit",
+      "aiCheckNames": "CodeRabbit, Copilot",
       "notificationsEnabled": true,
       "notifyAiReviewDone": true,
       "notifyCiPassed": true,

@@ -205,14 +205,20 @@ function matchesAiCheckPattern(name, patterns) {
 }
 
 /**
- * Whether the checks include an AI Check and every AI Check has finished.
+ * Whether an AI Check or an AI reviewer's Review exists, every AI Check has finished, and no AI reviewer is still requested.
  * @param {CheckContext[]} checks
+ * @param {Review[]} reviews
+ * @param {string[]} requestedBots Logins of the bots a Review request is pending for.
  * @param {string[]} patterns Lowercase AI check patterns.
  * @returns {boolean}
  */
-function aiReviewDone(checks, patterns) {
-    var aiChecks = checks.filter(function (check) { return matchesAiCheckPattern(checkName(check), patterns); });
-    return aiChecks.length > 0 && aiChecks.every(function (check) { return checkStatus(check) !== "running"; });
+function aiReviewDone(checks, reviews, requestedBots, patterns) {
+    var isAi = function (name) { return matchesAiCheckPattern(name, patterns); };
+    var aiChecks = checks.filter(function (check) { return isAi(checkName(check)); });
+    var hasAiReview = reviews.some(function (review) { return isAi(review.author); });
+    return (aiChecks.length > 0 || hasAiReview)
+        && aiChecks.every(function (check) { return checkStatus(check) !== "running"; })
+        && !requestedBots.some(isAi);
 }
 
 /** Statuses from worst to best. */
@@ -370,6 +376,7 @@ var QUERY = "query { viewer { login organizations(first: 100) { nodes { teams(fi
     + " timelineItems(itemTypes: [REVIEW_REQUESTED_EVENT], last: 20) { nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer { ... on User { isViewer } ... on Team { combinedSlug } } } } }"
     + " reviewThreads(first: 100) { nodes { isResolved } }"
     + " latestReviews(first: 20) { nodes { id state author { login } } }"
+    + " reviewRequests(first: 20) { nodes { requestedReviewer { ... on Bot { login } } } }"
     + " commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {"
     + " __typename ... on CheckRun { name status conclusion databaseId checkSuite { workflowRun { workflow { name } } } } ... on StatusContext { context state } } } } } } } }";
 
@@ -417,7 +424,7 @@ function toPullRequest(node, aiCheckPatterns, teams) {
         reviewRequestedAt: latestReviewRequestAt(node.timelineItems.nodes, teams) || node.createdAt,
         author: userLogin(node.author),
         status: prStatus(checks),
-        aiReviewDone: aiReviewDone(checks, aiCheckPatterns),
+        aiReviewDone: aiReviewDone(checks, latestReviews, requestedBots(node.reviewRequests.nodes), aiCheckPatterns),
         reviewDecision: node.reviewDecision,
         unresolvedThreadCount: node.reviewThreads.nodes.filter(function (thread) { return !thread.isResolved; }).length,
         approvalCount: latestReviews.filter(isApproval).length,
@@ -521,6 +528,17 @@ function latestReviewRequestAt(requests, teams) {
         return reviewer !== null && (reviewer.isViewer === true || teams.indexOf(reviewer.combinedSlug) !== -1);
     });
     return reviewRequests.length > 0 ? reviewRequests[reviewRequests.length - 1].createdAt : "";
+}
+
+/**
+ * Logins of the bots among pending Review requests.
+ * @param {{requestedReviewer: ?{login?: string}}[]} requests
+ * @returns {string[]}
+ */
+function requestedBots(requests) {
+    return requests
+        .map(function (request) { return request.requestedReviewer && request.requestedReviewer.login; })
+        .filter(Boolean);
 }
 
 function toReview(node) {

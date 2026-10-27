@@ -55,7 +55,7 @@ Panel {
   property bool settingsOpen: false
   property int tabIndex: 0
 
-  readonly property string aiCheckNames: String(setting("aiCheckNames", "CodeRabbit"))
+  readonly property string aiCheckNames: String(setting("aiCheckNames", "CodeRabbit, Copilot"))
   readonly property int refreshIntervalSec: Prs.refreshIntervalSec(setting("refreshIntervalSec", Prs.REFRESH_INTERVAL_DEFAULT_SEC))
   readonly property int authoredMaxAgeDays: Prs.maxAgeDays(setting("authoredMaxAgeDays", Prs.MAX_AGE_DEFAULT_DAYS))
   readonly property int toReviewMaxAgeDays: Prs.maxAgeDays(setting("toReviewMaxAgeDays", Prs.MAX_AGE_DEFAULT_DAYS))
