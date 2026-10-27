@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "lucas.gh-prs",
+  "id": "io.github.lucasateixeira.gh-prs",
   "name": "GitHub PRs",
   "version": "1.0.0",
-  "author": "Lucas",
+  "author": "Lucas Teixeira",
   "license": "MIT",
   "description": "Your open GitHub pull requests with their CI status. Needs the gh CLI, logged in with gh auth login.",
   "kinds": [

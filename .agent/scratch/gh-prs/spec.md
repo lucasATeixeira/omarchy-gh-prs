@@ -4,7 +4,7 @@ An Omarchy shell bar widget that shows the CI status of the user's open GitHub p
 
 ## Plugin
 
-- Id `lucas.gh-prs`, at `~/.config/omarchy/plugins/lucas.gh-prs/`, local only, in the bar's `right` section.
+- Id `io.github.lucasateixeira.gh-prs`, at `~/.config/omarchy/plugins/io.github.lucasateixeira.gh-prs/`, public at https://github.com/lucasATeixeira/omarchy-gh-prs, in the bar's `right` section.
 - A bar widget; clicking the bar item opens a popup panel.
 
 ## Data

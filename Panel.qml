@@ -11,8 +11,8 @@ import "js/prs.js" as Prs
 Panel {
   id: root
 
-  moduleName: "lucas.gh-prs"
-  ipcTarget: "lucas.gh-prs"
+  moduleName: "io.github.lucasateixeira.gh-prs"
+  ipcTarget: "io.github.lucasateixeira.gh-prs"
 
   readonly property string iconGithub: "" // nf-fa-github
   readonly property string iconError: "✕"
