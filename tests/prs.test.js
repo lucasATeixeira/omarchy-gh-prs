@@ -1110,8 +1110,9 @@ describe('pollNotifications merged and closed', () => {
 const comment = (author, publishedAt = '2026-10-19T11:00:00Z') => ({ author, publishedAt })
 const updated = () => Object.assign(withId(1), { updatedAt: '2026-10-19T12:00:00Z' })
 const commentDetails = (codeComments) => [{ id: 'PR_1', state: 'OPEN', actor: '', codeComments }]
-const commentNotifications = (codeComments) =>
-  sent(P.pollNotifications([withId(1)], [updated()], commentDetails(codeComments), 'me'))
+const previousPollStart = '2026-10-19T10:00:00Z'
+const commentNotifications = (codeComments, polledFrom = previousPollStart) =>
+  sent(P.pollNotifications([withId(1)], [updated()], commentDetails(codeComments), 'me', polledFrom))
 
 describe('pollNotifications code comments', () => {
   it('names the author of a single new comment', () => {
@@ -1135,7 +1136,7 @@ describe('pollNotifications code comments', () => {
   it('counts a reply in a resolved thread', () => {
     const resolved = { isResolved: true, comments: { nodes: [commentNode('ana', '2026-10-19T09:00:00Z'), commentNode('bob', '2026-10-19T11:00:00Z')] } }
     const { details } = P.parseDetailsRun(0, detailsResponse([detailsNode('OPEN', null, null, [resolved])]), '')
-    assert.deepEqual(sent(P.pollNotifications([withId(1)], [updated()], details, 'me')),
+    assert.deepEqual(sent(P.pollNotifications([withId(1)], [updated()], details, 'me', previousPollStart)),
       [['notifyCodeComments', 'New code comment from bob', 1]])
   })
 
@@ -1143,9 +1144,13 @@ describe('pollNotifications code comments', () => {
     assert.deepEqual(commentNotifications([comment('ana', '2026-10-19T09:00:00Z'), comment('bob', '2026-10-19T10:00:00Z')]), [])
   })
 
+  it('skips comments the previous poll could see although they did not move updatedAt', () => {
+    assert.deepEqual(commentNotifications([comment('ana', '2026-10-19T10:30:00Z')], '2026-10-19T11:00:00Z'), [])
+  })
+
   it('sends both the Review and the comments of the same poll', () => {
     const now = Object.assign(updated(), { latestReviews: [review('R1', 'APPROVED')] })
-    assert.deepEqual(sent(P.pollNotifications([withId(1)], [now], commentDetails([comment('ana')]), 'me')), [
+    assert.deepEqual(sent(P.pollNotifications([withId(1)], [now], commentDetails([comment('ana')]), 'me', previousPollStart)), [
       ['notifyApproved', 'Approved by ana', 1],
       ['notifyCodeComments', 'New code comment from ana', 1]
     ])

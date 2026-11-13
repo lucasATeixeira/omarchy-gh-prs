@@ -46,6 +46,10 @@ Panel {
   property real now: 0
   // PRs the next poll's notifications compare against.
   property var lastPrs: null
+  // ISO 8601 time the poll that produced lastPrs started.
+  property string lastPrsPollStart: ""
+  // ISO 8601 time the running poll started.
+  property string pollStart: ""
   // The successful main poll that waits for its AI threads query.
   property var pendingAiThreadsPoll: null
   // The successful main poll that waits for its details query.
@@ -98,6 +102,7 @@ Panel {
   function refresh() {
     if (polling) return
     themeFile.reload()
+    root.pollStart = new Date().toISOString()
     fetchProc.running = true
   }
 
@@ -172,8 +177,9 @@ Panel {
 
   // Sends the poll's notifications and keeps its PRs for the next poll.
   function finishPoll(poll, details) {
-    Prs.pollNotifications(root.lastPrs, poll.prs, details, poll.viewerLogin).forEach(root.notify)
+    Prs.pollNotifications(root.lastPrs, poll.prs, details, poll.viewerLogin, root.lastPrsPollStart).forEach(root.notify)
     root.lastPrs = poll.prs
+    root.lastPrsPollStart = root.pollStart
   }
 
   onOpenedChanged: opened ? refresh() : closeSettings()

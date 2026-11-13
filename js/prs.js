@@ -669,9 +669,10 @@ function toPrDetails(node) {
  * @param {PullRequest[]} currentPrs
  * @param {?PrDetails[]} details Null when the details query did not run or failed.
  * @param {string} viewerLogin
+ * @param {string} previousPollStart ISO 8601 time the previous successful poll started.
  * @returns {Notification[]}
  */
-function pollNotifications(previousPrs, currentPrs, details, viewerLogin) {
+function pollNotifications(previousPrs, currentPrs, details, viewerLogin, previousPollStart) {
     var aiReviews = finishedAiReviews(previousPrs, currentPrs).map(function (pr) {
         var title = pr.aiChangesSuggested ? "AI review: changes suggested" : "AI review: no changes suggested";
         return { setting: "notifyAiReviewDone", title: title, pr: pr };
@@ -680,26 +681,28 @@ function pollNotifications(previousPrs, currentPrs, details, viewerLogin) {
         return { setting: ciNotificationSetting(pr.status), title: ciNotificationTitle(pr.status), pr: pr };
     });
     return aiReviews.concat(ci, reviewNotifications(previousPrs, currentPrs),
-        codeCommentNotifications(previousPrs, currentPrs, details || [], viewerLogin),
+        codeCommentNotifications(previousPrs, currentPrs, details || [], viewerLogin, previousPollStart),
         mergedOrClosedNotifications(previousPrs, currentPrs, details || [], viewerLogin));
 }
 
 /**
- * One notification per PR that has Code comments from others published after the previous poll's `updatedAt`.
+ * One notification per PR that has Code comments from others published after the previous poll started.
+ * A PR's `updatedAt` is not a safe cutoff: GitHub does not move it for every comment.
  * @param {?PullRequest[]} previousPrs
  * @param {PullRequest[]} currentPrs
  * @param {PrDetails[]} details
  * @param {string} viewerLogin
+ * @param {string} previousPollStart ISO 8601 time.
  * @returns {Notification[]}
  */
-function codeCommentNotifications(previousPrs, currentPrs, details, viewerLogin) {
+function codeCommentNotifications(previousPrs, currentPrs, details, viewerLogin, previousPollStart) {
     var notifications = [];
     currentPrs.forEach(function (now) {
         var before = previousPr(previousPrs, now);
         var prDetails = detailsFor(details, now);
         if (before === undefined || prDetails === undefined) return;
         var newComments = prDetails.codeComments.filter(function (comment) {
-            return comment.publishedAt > before.updatedAt && comment.author !== viewerLogin;
+            return comment.publishedAt > previousPollStart && comment.author !== viewerLogin;
         });
         if (newComments.length === 0) return;
         var title = newComments.length === 1
